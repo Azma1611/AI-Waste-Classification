@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="AI-powered waste classification system that identifies waste items from photos and provides recycling recommendations, environmental impact data, and eco-tips.">
+  <meta property="og:title" content="EcoScan AI — Smart Waste Classification">
+  <meta property="og:description" content="Snap a photo, classify your waste, and get instant recycling recommendations powered by on-device AI.">
+  <meta property="og:type" content="website">
+  <title>EcoScan AI — Smart Waste Classification & Recycling</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>♻️</text></svg>">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Particle Background Canvas -->
+  <canvas id="particle-canvas" aria-hidden="true"></canvas>
+
+  <div class="app-container">
+
+    <!-- ═══ Header ═══ -->
+    <header class="app-header" id="app-header">
+      <a href="#" class="logo">
+        <div class="logo-icon">♻️</div>
+        <div>
+          <div class="logo-text">EcoScan AI</div>
+          <div class="logo-tagline">Smart Waste Classification</div>
+        </div>
+      </a>
+      <div class="header-stats">
+        <div class="header-stat">
+          <div class="header-stat-value" id="stat-total-scans">0</div>
+          <div class="header-stat-label">Scans</div>
+        </div>
+        <div class="header-stat">
+          <div class="header-stat-value" id="stat-co2-saved">0 kg</div>
+          <div class="header-stat-label">CO₂ Saved</div>
+        </div>
+      </div>
+    </header>
+
+    <!-- ═══ Hero ═══ -->
+    <section class="hero" id="hero-section">
+      <h1>Classify Waste with <span class="gradient-text">AI Intelligence</span></h1>
+      <p class="hero-subtitle">
+        Snap a photo or upload an image — our on-device AI instantly identifies waste items
+        and provides detailed recycling instructions, environmental impact data, and eco-tips.
+        100% private — your images never leave your device.
+      </p>
+    </section>
+
+    <!-- ═══ Upload Zone ═══ -->
+    <section class="upload-section" id="upload-section">
+      <div class="upload-zone" id="upload-zone" role="button" tabindex="0" aria-label="Upload or drag and drop an image of waste to classify">
+        <span class="upload-icon" aria-hidden="true">📸</span>
+        <div class="upload-title">Drop your image here or click to upload</div>
+        <div class="upload-desc">Supports JPG, PNG, WebP — or use your camera</div>
+        <div class="upload-actions">
+          <button class="btn btn-primary" id="btn-upload" type="button">
+            <span class="btn-icon">📁</span> Upload Image
+          </button>
+          <button class="btn btn-secondary" id="btn-camera" type="button">
+            <span class="btn-icon">📷</span> Use Camera
+          </button>
+        </div>
+        <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp" aria-label="Select image file">
+
+        <!-- Preview inside upload zone -->
+        <div class="preview-container" id="preview-container">
+          <div class="preview-wrapper">
+            <img id="preview-image" alt="Uploaded waste item preview" src="">
+            <div class="preview-overlay" id="preview-overlay">
+              <div class="scan-line"></div>
+              <div class="scan-text">
+                <div class="scan-spinner"></div>
+                Analyzing...
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Classification Results ═══ -->
+    <section class="results-section" id="results-section" aria-live="polite">
+      <div class="result-card" id="result-card">
+        <div class="result-header">
+          <img class="result-image-thumb" id="result-thumb" alt="Classified item thumbnail" src="">
+          <div class="result-info">
+            <div class="result-item-name" id="result-item-name">—</div>
+            <span class="result-category-badge" id="result-badge">—</span>
+          </div>
+          <div class="confidence-ring-container">
+            <div class="confidence-ring">
+              <svg viewBox="0 0 90 90">
+                <circle class="ring-bg" cx="45" cy="45" r="40"></circle>
+                <circle class="ring-fill" id="confidence-ring-fill" cx="45" cy="45" r="40"></circle>
+              </svg>
+              <div class="confidence-value" id="confidence-value">0%</div>
+            </div>
+            <div class="confidence-label">Confidence</div>
+          </div>
+        </div>
+
+        <!-- Result content panels -->
+        <div class="result-content">
+          <!-- Recycling Steps -->
+          <div class="result-panel animate-in delay-1">
+            <div class="panel-title">
+              <span class="panel-icon">♻️</span> How to Recycle
+            </div>
+            <ol class="steps-list" id="recycle-steps"></ol>
+          </div>
+
+          <!-- Don'ts -->
+          <div class="result-panel animate-in delay-2">
+            <div class="panel-title">
+              <span class="panel-icon">🚫</span> Common Mistakes
+            </div>
+            <ul class="dont-list" id="recycle-donts"></ul>
+          </div>
+
+          <!-- Environmental Impact -->
+          <div class="result-panel animate-in delay-3">
+            <div class="panel-title">
+              <span class="panel-icon">🌍</span> Environmental Impact
+            </div>
+            <div class="impact-grid" id="impact-grid"></div>
+          </div>
+
+          <!-- Tips -->
+          <div class="result-panel animate-in delay-4">
+            <div class="panel-title">
+              <span class="panel-icon">💡</span> Pro Tips
+            </div>
+            <ul class="tips-list" id="recycle-tips"></ul>
+          </div>
+        </div>
+
+        <!-- Factoid -->
+        <div class="factoid" id="result-factoid">
+          <span class="factoid-icon">🌱</span>
+          <span class="factoid-text" id="factoid-text">—</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Classification History ═══ -->
+    <section class="history-section" id="history-section">
+      <div class="section-header">
+        <h2 class="section-title">
+          <span class="section-icon">📋</span> Classification History
+        </h2>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+          <div class="filter-chips" id="filter-chips">
+            <button class="filter-chip active" data-filter="all">All</button>
+            <button class="filter-chip" data-filter="plastic">♻️ Plastic</button>
+            <button class="filter-chip" data-filter="glass">🫙 Glass</button>
+            <button class="filter-chip" data-filter="metal">🥫 Metal</button>
+            <button class="filter-chip" data-filter="organic">🍂 Organic</button>
+            <button class="filter-chip" data-filter="paper">📄 Paper</button>
+            <button class="filter-chip" data-filter="ewaste">💻 E-Waste</button>
+            <button class="filter-chip" data-filter="hazardous">⚠️ Hazardous</button>
+          </div>
+          <button class="btn-clear-history" id="btn-clear-history" type="button">Clear History</button>
+        </div>
+      </div>
+      <div class="history-grid" id="history-grid">
+        <div class="history-empty" id="history-empty">
+          <span class="history-empty-icon">📷</span>
+          No items classified yet. Upload an image to get started!
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Stats Dashboard ═══ -->
+    <section class="stats-section" id="stats-section">
+      <div class="section-header">
+        <h2 class="section-title">
+          <span class="section-icon">📊</span> Your Impact Dashboard
+        </h2>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-card-icon">🔍</div>
+          <span class="stat-card-value" id="dash-total">0</span>
+          <span class="stat-card-label">Items Scanned</span>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-icon">🌱</div>
+          <span class="stat-card-value" id="dash-co2">0 kg</span>
+          <span class="stat-card-label">CO₂ Saved</span>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-icon">⚡</div>
+          <span class="stat-card-value" id="dash-energy">0 kWh</span>
+          <span class="stat-card-label">Energy Saved</span>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-icon">💧</div>
+          <span class="stat-card-value" id="dash-water">0 L</span>
+          <span class="stat-card-label">Water Saved</span>
+        </div>
+      </div>
+      <div class="chart-container" id="chart-container">
+        <div class="chart-canvas-wrapper">
+          <canvas id="donut-chart" width="220" height="220"></canvas>
+        </div>
+        <div class="chart-legend" id="chart-legend"></div>
+      </div>
+    </section>
+
+    <!-- ═══ Educational Guide ═══ -->
+    <section class="guide-section" id="guide-section">
+      <div class="section-header">
+        <h2 class="section-title">
+          <span class="section-icon">📖</span> Waste Category Guide
+        </h2>
+      </div>
+      <div class="guide-grid" id="guide-grid"></div>
+    </section>
+
+    <!-- ═══ Eco Ticker ═══ -->
+    <div class="eco-ticker" id="eco-ticker">
+      <div class="eco-ticker-content" id="eco-ticker-content">
+        <span class="eco-ticker-icon">🌍</span>
+        <span class="eco-ticker-text" id="eco-ticker-text">Loading eco-tip...</span>
+      </div>
+    </div>
+
+    <!-- ═══ Decomposition Timeline ═══ -->
+    <section class="guide-section">
+      <div class="section-header">
+        <h2 class="section-title">
+          <span class="section-icon">⏳</span> Decomposition Timeline
+        </h2>
+      </div>
+      <div class="timeline-bar-container" id="decomposition-timeline"></div>
+    </section>
+
+    <!-- ═══ Footer ═══ -->
+    <footer class="app-footer">
+      <p class="footer-tagline">Built with <span class="gradient-text">AI for a greener planet</span></p>
+      <p>EcoScan AI — On-device classification • 100% private • Zero emissions</p>
+    </footer>
+  </div>
+
+  <!-- ═══ Camera Modal ═══ -->
+  <div class="camera-modal" id="camera-modal" role="dialog" aria-label="Camera capture">
+    <video class="camera-video" id="camera-video" autoplay playsinline></video>
+    <canvas id="camera-canvas" style="display:none;"></canvas>
+    <div class="camera-controls">
+      <button class="btn-close-camera" id="btn-close-camera" type="button" aria-label="Close camera">✕</button>
+      <button class="btn-capture" id="btn-capture" type="button" aria-label="Capture photo"></button>
+    </div>
+  </div>
+
+  <!-- ═══ Toast ═══ -->
+  <div class="toast" id="toast" role="alert">
+    <span class="toast-icon" id="toast-icon">✅</span>
+    <span id="toast-text">Action completed</span>
+  </div>
+
+  <!-- TensorFlow.js & MobileNet (from CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js"></script>
+
+  <!-- App scripts -->
+  <script src="waste-data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

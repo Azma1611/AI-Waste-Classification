@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="AI-powered waste classification system that identifies waste items from photos and provides recycling recommendations using MobileNetV2 deep learning.">
+  <meta property="og:title" content="EcoScan AI — Smart Waste Classification & Recycling">
+  <meta property="og:description" content="Upload a photo of waste — our AI instantly classifies it and provides detailed recycling recommendations.">
+  <meta property="og:type" content="website">
+  <title>EcoScan AI — Smart Waste Classification & Recycling</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>♻️</text></svg>">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Particle Background Canvas -->
+  <canvas id="particle-canvas" aria-hidden="true"></canvas>
+
+  <div class="app-container">
+
+    <!-- ═══ Header ═══ -->
+    <header class="app-header" id="app-header">
+      <a href="#" class="logo">
+        <div class="logo-icon">♻️</div>
+        <div>
+          <div class="logo-text">EcoScan AI</div>
+          <div class="logo-tagline">Smart Waste Classification</div>
+        </div>
+      </a>
+      <div class="header-actions">
+        <div class="model-status" id="model-status">
+          <span class="status-dot" id="status-dot"></span>
+          <span class="status-text" id="status-text">Connecting...</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ═══ Hero ═══ -->
+    <section class="hero" id="hero-section">
+      <h1>Classify Waste with <span class="gradient-text">AI Intelligence</span></h1>
+      <p class="hero-subtitle">
+        Upload an image of any waste item — our MobileNetV2 deep learning model instantly
+        classifies it into <strong>Hazardous</strong>, <strong>Recyclable</strong>,
+        <strong>Non-Recyclable</strong>, or <strong>Organic</strong> and provides
+        detailed recycling instructions.
+      </p>
+      <div class="hero-badges">
+        <span class="hero-badge hazardous">☣️ Hazardous</span>
+        <span class="hero-badge recyclable">♻️ Recyclable</span>
+        <span class="hero-badge non-recyclable">🗑️ Non-Recyclable</span>
+        <span class="hero-badge organic">🌿 Organic</span>
+      </div>
+    </section>
+
+    <!-- ═══ Upload Zone ═══ -->
+    <section class="upload-section" id="upload-section">
+      <div class="upload-zone" id="upload-zone" role="button" tabindex="0" aria-label="Upload or drag and drop an image of waste to classify">
+        <span class="upload-icon" aria-hidden="true">📸</span>
+        <div class="upload-title">Drop your image here or click to upload</div>
+        <div class="upload-desc">Supports JPG, PNG, WebP, BMP — max 16 MB</div>
+        <div class="upload-actions">
+          <button class="btn btn-primary" id="btn-upload" type="button">
+            <span class="btn-icon">📁</span> Upload Image
+          </button>
+        </div>
+        <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp,image/bmp" aria-label="Select image file">
+
+        <!-- Preview inside upload zone -->
+        <div class="preview-container" id="preview-container">
+          <div class="preview-wrapper">
+            <img id="preview-image" alt="Uploaded waste item preview" src="">
+            <div class="preview-overlay" id="preview-overlay">
+              <div class="scan-line"></div>
+              <div class="scan-text">
+                <div class="scan-spinner"></div>
+                Analyzing...
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-accent" id="btn-predict" type="button">
+            <span class="btn-icon">🔍</span> Classify Waste
+          </button>
+          <button class="btn btn-secondary btn-sm" id="btn-reset" type="button">
+            <span class="btn-icon">🔄</span> Upload Another
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Classification Results ═══ -->
+    <section class="results-section" id="results-section" aria-live="polite">
+      <div class="result-card" id="result-card">
+        <div class="result-header">
+          <img class="result-image-thumb" id="result-thumb" alt="Classified item" src="">
+          <div class="result-info">
+            <div class="result-item-name" id="result-item-name">—</div>
+            <span class="result-category-badge" id="result-badge">—</span>
+            <div class="result-recommendation" id="result-recommendation">—</div>
+          </div>
+          <div class="confidence-ring-container">
+            <div class="confidence-ring">
+              <svg viewBox="0 0 90 90">
+                <circle class="ring-bg" cx="45" cy="45" r="40"></circle>
+                <circle class="ring-fill" id="confidence-ring-fill" cx="45" cy="45" r="40"></circle>
+              </svg>
+              <div class="confidence-value" id="confidence-value">0%</div>
+            </div>
+            <div class="confidence-label">Confidence</div>
+          </div>
+        </div>
+
+        <!-- All Predictions Breakdown -->
+        <div class="predictions-breakdown" id="predictions-breakdown">
+          <div class="panel-title">
+            <span class="panel-icon">📊</span> All Class Probabilities
+          </div>
+          <div class="prediction-bars" id="prediction-bars"></div>
+        </div>
+
+        <!-- Result content panels -->
+        <div class="result-content">
+          <!-- Recycling Steps -->
+          <div class="result-panel animate-in delay-1">
+            <div class="panel-title">
+              <span class="panel-icon">♻️</span> How to Dispose
+            </div>
+            <ol class="steps-list" id="recycle-steps"></ol>
+          </div>
+
+          <!-- Don'ts -->
+          <div class="result-panel animate-in delay-2">
+            <div class="panel-title">
+              <span class="panel-icon">🚫</span> Common Mistakes
+            </div>
+            <ul class="dont-list" id="recycle-donts"></ul>
+          </div>
+        </div>
+
+        <!-- Factoid -->
+        <div class="factoid" id="result-factoid">
+          <span class="factoid-icon">🌱</span>
+          <span class="factoid-text" id="factoid-text">—</span>
+        </div>
+
+        <!-- Classify Another -->
+        <div class="result-actions">
+          <button class="btn btn-primary" id="btn-classify-another" type="button">
+            <span class="btn-icon">📷</span> Classify Another Image
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Classification History ═══ -->
+    <section class="history-section" id="history-section">
+      <div class="section-header">
+        <h2 class="section-title">
+          <span class="section-icon">📋</span> Classification History
+        </h2>
+        <button class="btn-clear-history" id="btn-clear-history" type="button">Clear History</button>
+      </div>
+      <div class="history-grid" id="history-grid">
+        <div class="history-empty" id="history-empty">
+          <span class="history-empty-icon">📷</span>
+          No items classified yet. Upload an image to get started!
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Category Guide ═══ -->
+    <section class="guide-section" id="guide-section">
+      <div class="section-header">
+        <h2 class="section-title">
+          <span class="section-icon">📖</span> Waste Category Guide
+        </h2>
+      </div>
+      <div class="guide-grid" id="guide-grid"></div>
+    </section>
+
+    <!-- ═══ Eco Ticker ═══ -->
+    <div class="eco-ticker" id="eco-ticker">
+      <div class="eco-ticker-content" id="eco-ticker-content">
+        <span class="eco-ticker-icon">🌍</span>
+        <span class="eco-ticker-text" id="eco-ticker-text">Loading eco-tip...</span>
+      </div>
+    </div>
+
+    <!-- ═══ Footer ═══ -->
+    <footer class="app-footer">
+      <p class="footer-tagline">Built with <span class="gradient-text">AI for a greener planet</span></p>
+      <p>EcoScan AI — MobileNetV2 Classification • Flask Backend • Python + TensorFlow</p>
+    </footer>
+  </div>
+
+  <!-- ═══ Toast ═══ -->
+  <div class="toast" id="toast" role="alert">
+    <span class="toast-icon" id="toast-icon">✅</span>
+    <span id="toast-text">Action completed</span>
+  </div>
+
+  <!-- App scripts -->
+  <script src="app.js"></script>
+</body>
+</html>
