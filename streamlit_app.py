@@ -367,32 +367,36 @@ if app_mode == "📊 System Setup & EDA":
             st.markdown(f"{icon} {item}")
 
 
-# ==============================================================================
-# 7. VIEW 2: LIVE IMAGE CLASSIFICATION WORKSPACE
-# ==============================================================================
 elif app_mode == "📸 Live Classification Workspace":
     st.title("📸 Live Waste Classification & Recycling Advisor")
     st.write("Upload an image of any waste item to receive an AI classification, Grad-CAM explanation, and recycling guidance.")
 
-    col_upload, col_results = st.columns([1, 1])
+    # ---------------------------------------------------------
+    # AI Engine UI
+    # ---------------------------------------------------------
+    left_column, right_column = st.columns([1, 1.2], gap="large")
 
-    with col_upload:
-        st.subheader("🖼️ Upload Waste Image")
-        uploaded_file = st.file_uploader(
-            "Drag & drop or click to upload",
-            type=["jpg", "jpeg", "png", "webp"],
-            label_visibility="collapsed",
-        )
-
-        if uploaded_file:
+    with left_column:
+        st.subheader("📸 Input Interface")
+        
+        input_method = st.radio("Choose Input Method:", ["📁 Upload File", "📷 Live Webcam"], horizontal=True)
+        
+        uploaded_file = None
+        
+        if input_method == "📁 Upload File":
+            uploaded_file = st.file_uploader("Drop your image file here...", type=["jpg", "png", "jpeg"])
+        else:
+            uploaded_file = st.camera_input("Take a snapshot of your waste item")
+        
+        if uploaded_file is not None:
             pil_img = Image.open(uploaded_file).convert("RGB")
-            st.image(pil_img, caption="Uploaded Image", use_container_width=True)
+            st.image(pil_img, caption="Target Waste Item", use_container_width=True)
             classify_btn = st.button("🔍 Classify Waste", use_container_width=True, type="primary")
         else:
             classify_btn = False
-            st.info("Please upload an image to begin.")
+            st.info("Please select an image or use the camera to begin.")
 
-    with col_results:
+    with right_column:
         st.subheader("🧠 AI Analysis Results")
 
         if uploaded_file and classify_btn:
