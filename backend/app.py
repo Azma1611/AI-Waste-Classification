@@ -14,9 +14,13 @@ import io
 import logging
 from datetime import datetime
 
+# pyrefly: ignore [missing-import]
 import numpy as np
+# pyrefly: ignore [missing-import]
 from flask import Flask, request, jsonify, send_from_directory
+# pyrefly: ignore [missing-import]
 from flask_cors import CORS
+# pyrefly: ignore [missing-import]
 from PIL import Image
 
 # ── TensorFlow import with GPU memory growth ─────────────────────
@@ -24,6 +28,7 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"  # Suppress TF info logs
 
 import tensorflow as tf
 from tensorflow.keras.models import load_model
+# pyrefly: ignore [missing-import]
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 
 # ═══════════════════════════════════════════════════════════════════
