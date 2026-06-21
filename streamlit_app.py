@@ -18,7 +18,6 @@ except ImportError:
 # ==============================================================================
 # 1. API CONFIGURATION & CORE SYSTEM LAYOUT
 # ==============================================================================
-# Paste your free Gemini API Key here for the Sidebar Chatbot feature
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "YOUR_GEMINI_API_KEY_HERE")
 
 if GEMINI_API_KEY != "YOUR_GEMINI_API_KEY_HERE":
@@ -29,6 +28,17 @@ st.set_page_config(
     page_icon="♻️",
     layout="wide",
 )
+
+# Show cloud demo-mode notice when TF is not available
+if not TF_AVAILABLE:
+    st.info(
+        "🌐 **Cloud Demo Mode** — TensorFlow is not available in this Python 3.14 "
+        "environment. Classification uses AI-simulated predictions. "
+        "Run locally with `.venv\\Scripts\\python -m streamlit run streamlit_app.py` "
+        "for full MobileNetV2 inference.",
+        icon="ℹ️",
+    )
+
 
 # Exact 6 target assignment categories
 classes = ["Plastic", "Paper", "Glass", "Metal", "Organic Waste", "E-Waste"]
