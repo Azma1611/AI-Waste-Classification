@@ -1,19 +1,10 @@
-# ----------------------------------------------------------------
-# EcoScan AI — Smart Waste Classification System
-# Python Dependencies
-# ----------------------------------------------------------------
-
-# Web Framework
-Flask==3.1.1
-flask-cors==5.0.1
-
-# Deep Learning
-tensorflow==2.18.0
+streamlit
+tensorflow-cpu==2.18.0
 numpy>=1.26.0,<2.0
-
-# Image Processing
 Pillow>=10.4.0
-
-# Production Server (optional)
-gunicorn>=22.0.0; sys_platform != 'win32'
-waitress>=3.0.0; sys_platform == 'win32'
+matplotlib
+seaborn
+opencv-python-headless
+google-generativeai
+scikit-learn
+pandas

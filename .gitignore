@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.gradio/
+data/
+model/results/
+*.log
+.env
+kaggle.json
+*.zip
+node_modules/
