@@ -1,5 +1,4 @@
 import streamlit as st
-import tensorflow as tf
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -8,6 +7,13 @@ import cv2
 from PIL import Image
 import google.generativeai as genai
 import os
+
+# TensorFlow is optional — app runs in demo mode if unavailable (e.g. Python 3.14 cloud)
+try:
+    import tensorflow as tf
+    TF_AVAILABLE = True
+except ImportError:
+    TF_AVAILABLE = False
 
 # ==============================================================================
 # 1. API CONFIGURATION & CORE SYSTEM LAYOUT
@@ -33,6 +39,9 @@ classes = ["Plastic", "Paper", "Glass", "Metal", "Organic Waste", "E-Waste"]
 @st.cache_resource
 def build_and_compile_assignment_model():
     """Builds and compiles MobileNetV2 with a trainable classification head."""
+    if not TF_AVAILABLE:
+        st.sidebar.warning("⚠️ TensorFlow unavailable — running in demo mode.")
+        return None, None
     try:
         base_model = tf.keras.applications.MobileNetV2(
             input_shape=(224, 224, 3),
@@ -58,7 +67,7 @@ def build_and_compile_assignment_model():
 
         return model, base_model
     except Exception as e:
-        st.error(f"Engine Warning: {e}")
+        st.sidebar.error(f"Model load error: {e}")
         return None, None
 
 
@@ -111,7 +120,9 @@ IMPACT_COLORS = {
 # 4. STEP 8: EXPLAINABLE AI ENGINE (GRAD-CAM)
 # ==============================================================================
 def compute_gradcam_heatmap(img_array, model, base_backbone):
-    """Generates Grad-CAM heatmap from the last conv layer of MobileNetV2."""
+    """Generates Grad-CAM heatmap. Returns placeholder if TF unavailable."""
+    if not TF_AVAILABLE or model is None or base_backbone is None:
+        return np.random.rand(7, 7)   # demo placeholder heatmap
     try:
         last_conv_layer = base_backbone.get_layer("out_relu")
         grad_model = tf.keras.models.Model(
