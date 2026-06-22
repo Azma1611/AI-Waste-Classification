@@ -315,9 +315,9 @@ if app_view == "📸 Prediction Workspace":
         st.session_state.heatmap = None
         st.session_state.uploaded_file_name = None
 
-    col_input, col_results = st.columns([1, 1.2], gap="large")
+    left_col, right_col = st.columns([1, 1], gap="large")
 
-    with col_input:
+    with left_col:
         st.subheader("📥 Input Interface")
         input_source = st.radio("Select Image Source:", ["📁 File Upload", "📷 Live Camera"], horizontal=True)
 
@@ -413,8 +413,8 @@ if app_view == "📸 Prediction Workspace":
         rec_info = recommendation_engine.get_recommendation(pred_class)
         env_info = impact_prediction.get_environmental_metrics(pred_class)
 
-        # Draw Prediction Results inside the right column (col_results)
-        with col_results:
+        # Draw Prediction Results inside the right column (right_col)
+        with right_col:
             st.subheader("🧠 Diagnostic Results")
             
             # 2. Main Classification Display
@@ -460,7 +460,7 @@ if app_view == "📸 Prediction Workspace":
                 "Probability": predictions
             }).sort_values("Probability", ascending=False)
             
-            fig, ax = plt.subplots(figsize=(6, 2))
+            fig, ax = plt.subplots(figsize=(6, 2.2))
             sns.barplot(data=chart_df, x="Probability", y="Category", palette="viridis", edgecolor="black", linewidth=0.5)
             plt.xlim(0, 1.1)
             plt.title("Class Logit Breakdown", fontsize=8, fontweight="bold")
@@ -470,32 +470,25 @@ if app_view == "📸 Prediction Workspace":
             fig.tight_layout()
             st.pyplot(fig)
             plt.close(fig)
-        # Row 2 (full width): Recycling Recommendations & Environmental Impact
+
+            # Explainable AI inside Row 1 Right Column
+            st.write("**Explainable AI — Grad-CAM Heatmap**")
+            st.caption("Highlighted regions show where the model focused its attention.")
+            overlay_img = gradcam.overlay_heatmap_on_image(pil_img, heatmap)
+            st.image(overlay_img, caption="Grad-CAM Activation Map", use_container_width=True)
+
+        # Row 2 (full width): Recycling Recommendations
         st.markdown("---")
-        st.markdown("### ♻️ Recycling & Environmental Analysis")
-        c1, c2, c3, c4 = st.columns(4)
+        st.markdown("## ♻️ Recycling Recommendations")
+        c1, c2, c3 = st.columns(3)
         with c1:
             st.metric("Recyclable?", rec_info.get("recyclable", "N/A"))
         with c2:
             st.metric("Decomposition Time", rec_info.get("decomposition_time", "N/A"))
         with c3:
             st.metric("Carbon Offset", f"~{rec_info.get('co2_saved_kg', 0.0)} kg CO2")
-        with c4:
-            st.metric("Environmental Impact Score", f"{env_info.get('impact_score', 0)}/100")
 
-        st.progress(env_info.get("impact_score", 0) / 100)
-
-        banner_col, info_col = st.columns([1, 1])
-        with banner_col:
-            st.markdown(
-                f"<div style='background-color:{env_info.get('impact_color')}; padding:12px; border-radius:8px; color:white; font-weight:bold; text-align:center;'>"
-                f"Severity Classification: {env_info.get('impact_class')} Impact"
-                f"</div>",
-                unsafe_allow_html=True
-            )
-            st.caption(f"*{env_info.get('description', '')}*")
-        with info_col:
-            st.info(f"💡 **Fun Fact:** {rec_info.get('fun_fact', '')}")
+        st.info(f"💡 **Fun Fact:** {rec_info.get('fun_fact', '')}")
 
         # Row 3 (full width): Do's and Don'ts in two equal columns
         st.markdown("### 📋 Disposal Guidance")
@@ -509,15 +502,21 @@ if app_view == "📸 Prediction Workspace":
             for dont_item in rec_info.get("donts", []):
                 st.markdown(f"<div class='dont-card'>❌ {dont_item}</div>", unsafe_allow_html=True)
 
-        # Row 4 (full width): Explainable AI (Grad-CAM & Activations)
-        st.markdown("### 🔬 Explainable AI (Grad-CAM Overlay)")
-        st.write("The heatmap highlights the exact regions in the image that motivated the network's prediction.")
-        overlay_img = gradcam.overlay_heatmap_on_image(pil_img, heatmap)
-        st.image(overlay_img, caption="Grad-CAM Hotspots Overlay", use_container_width=True)
+        # Row 4 (full width): Environmental Impact Section
+        st.markdown("## 🌍 Environmental Impact")
+        st.metric("Impact Score (0 - 100)", f"{env_info.get('impact_score', 0)}/100")
+        st.progress(env_info.get("impact_score", 0) / 100)
+        st.markdown(
+            f"<div style='background-color:{env_info.get('impact_color')}; padding:12px; border-radius:8px; color:white; font-weight:bold; text-align:center; margin-bottom: 12px;'>"
+            f"Severity Classification: {env_info.get('impact_class')} Impact"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+        st.write(f"*{env_info.get('description', '')}*")
 
         # Feature Visualizations grid
         if TF_AVAILABLE and model is not None:
-            st.markdown("#### ⚙️ Layer Activations Visualization")
+            st.markdown("### ⚙️ Layer Activations Visualization")
             with st.expander("Expand to view feature activations of intermediate convolutional layers"):
                 st.write("Extracting activations from the first, middle, and final convolutional layers...")
                 with st.spinner("Extracting layer feature maps..."):
@@ -541,7 +540,7 @@ if app_view == "📸 Prediction Workspace":
         )
 
     elif not uploaded_file:
-        with col_results:
+        with right_col:
             st.subheader("🧠 Diagnostic Results")
             st.markdown("""
             ### 📝 Usage Workflow

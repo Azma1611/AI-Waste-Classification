@@ -460,7 +460,7 @@ elif app_mode == "📸 Live Classification Workspace":
     # ---------------------------------------------------------
     # AI Engine UI
     # ---------------------------------------------------------
-    left_column, right_column = st.columns([1, 1.2], gap="large")
+    left_column, right_column = st.columns([1, 1], gap="large")
 
     with left_column:
         st.subheader("📸 Input Interface")
@@ -556,6 +556,7 @@ elif app_mode == "📸 Live Classification Workspace":
             predictions = st.session_state.predictions
             pred_class = st.session_state.pred_class
             confidence = st.session_state.confidence
+            heatmap = st.session_state.heatmap
 
             # Interactive class correction dropdown
             corrected_class = st.selectbox(
@@ -599,6 +600,12 @@ elif app_mode == "📸 Live Classification Workspace":
                 use_container_width=True,
             )
 
+            # ── Explainable AI inside Row 1 Right Column ──────────────────────
+            st.write("**Explainable AI — Grad-CAM Heatmap**")
+            st.caption("Highlighted regions show where the model focused its attention.")
+            superimposed = overlay_gradcam(pil_img, heatmap)
+            st.image(superimposed, caption="Grad-CAM Activation Map", use_container_width=True)
+
         elif not uploaded_file:
             st.markdown("""
             **How it works:**
@@ -614,7 +621,6 @@ elif app_mode == "📸 Live Classification Workspace":
     # ── Full-Width Sections Below the Columns ───────────────────────────
     if uploaded_file and st.session_state.uploaded_file_name == uploaded_file.name:
         pred_class = st.session_state.pred_class
-        heatmap = st.session_state.heatmap
 
         # Load full recommendations from the centralized engine
         rec_info = recommendation_engine.get_recommendation(pred_class)
@@ -629,31 +635,17 @@ elif app_mode == "📸 Live Classification Workspace":
         impact_map   = {"Low": 20, "Medium": 50, "High": 75, "Critical": 100}
         impact_score = impact_map.get(impact, 50)
 
-        # ── Row 2 (full width): Recycling Recommendations & Environmental Impact Score ──
+        # ── Row 2 (full width): Recycling Recommendations ──
         st.markdown("---")
-        st.markdown("### ♻️ Recycling Recommendations & Actions")
-        rec_col1, rec_col2, rec_col3, rec_col4 = st.columns(4)
+        st.markdown("## ♻️ Recycling Recommendations")
+        rec_col1, rec_col2, rec_col3 = st.columns(3)
         rec_col1.metric("Recyclable?",      rec)
-        rec_col2.metric("Decomposition",    time)
-        rec_col3.metric("Impact Level",      impact)
-        rec_col4.metric("Environmental Impact Score", f"{impact_score}/100")
+        rec_col2.metric("Decomposition Time", time)
+        rec_col3.metric("Carbon Offset",    f"~{carbon} kg CO2")
         
-        st.progress(impact_score / 100)
-        
-        # Tip & Carbon footprint & Impact Banner & Fun Fact
-        col_banner, col_tips = st.columns(2)
-        with col_banner:
-            st.markdown(
-                f"<div style='background:{imp_color}; padding:12px; border-radius:8px; "
-                f"color:white; font-weight:bold; font-size:16px; text-align:center;'>"
-                f"⚠️ {impact} Impact  —  Score: {impact_score}/100</div>",
-                unsafe_allow_html=True,
-            )
-            if "fun_fact" in rec_info:
-                st.info(f"💡 **Fun Fact:** {rec_info['fun_fact']}")
-        with col_tips:
-            st.info(f"💡 **Tip:** {tip}")
-            st.success(f"🌍 **CO₂ Saved by Recycling:** ~{carbon} kg per item")
+        st.info(f"💡 **Tip:** {tip}")
+        if "fun_fact" in rec_info:
+            st.info(f"💡 **Fun Fact:** {rec_info['fun_fact']}")
 
         # ── Row 3 (full width): Do's and Don'ts Lists ──
         st.markdown("### 📋 Disposal Guidance")
@@ -667,8 +659,13 @@ elif app_mode == "📸 Live Classification Workspace":
             for dont_item in rec_info.get("donts", []):
                 st.markdown(f"<div class='dont-card'>❌ {dont_item}</div>", unsafe_allow_html=True)
 
-        # ── Row 4 (full width): Grad-CAM Explainability ──
-        st.markdown("### 🔬 Explainable AI — Grad-CAM Heatmap")
-        st.caption("Highlighted regions show where the model focused its attention.")
-        superimposed = overlay_gradcam(pil_img, heatmap)
-        st.image(superimposed, caption="Grad-CAM Activation Map", use_container_width=True)
+        # ── Row 4 (full width): Environmental Impact Section ──
+        st.markdown("## 🌍 Environmental Impact")
+        st.metric("Impact Score (0 - 100)", f"{impact_score}/100")
+        st.progress(impact_score / 100)
+        st.markdown(
+            f"<div style='background:{imp_color}; padding:12px; border-radius:8px; "
+            f"color:white; font-weight:bold; font-size:16px; text-align:center; margin-bottom: 12px;'>"
+            f"⚠️ {impact} Impact  —  Score: {impact_score}/100</div>",
+            unsafe_allow_html=True,
+        )
