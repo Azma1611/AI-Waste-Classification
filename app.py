@@ -121,6 +121,11 @@ st.markdown("""
         overflow-wrap: break-word !important;
         text-overflow: clip !important;
     }
+    [data-testid="stImage"] img {
+        max-height: 350px !important;
+        object-fit: contain !important;
+        border-radius: 8px;
+    }
 </style>
 """,unsafe_allow_html=True)
 
@@ -471,26 +476,41 @@ if app_view == "📸 Prediction Workspace":
             st.pyplot(fig)
             plt.close(fig)
 
-            # Explainable AI inside Row 1 Right Column
-            st.write("**Explainable AI — Grad-CAM Heatmap**")
-            st.caption("Highlighted regions show where the model focused its attention.")
-            overlay_img = gradcam.overlay_heatmap_on_image(pil_img, heatmap)
-            st.image(overlay_img, caption="Grad-CAM Activation Map", use_container_width=True)
+        # Row 2 (full width): Grad-CAM Explainability
+        st.markdown("---")
+        st.markdown("## 🔬 Explainable AI — Grad-CAM Heatmap")
+        st.caption("Highlighted regions show where the model focused its attention to classify the waste object.")
+        overlay_img = gradcam.overlay_heatmap_on_image(pil_img, heatmap, alpha=0.4)
+        st.image(overlay_img, caption="Grad-CAM Activation Map Overlay (Alpha=0.4)", use_container_width=True)
 
-        # Row 2 (full width): Recycling Recommendations
+        # Row 3 (full width): Recycling Recommendations
         st.markdown("---")
         st.markdown("## ♻️ Recycling Recommendations")
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            st.metric("Recyclable?", rec_info.get("recyclable", "N/A"))
-        with c2:
-            st.metric("Decomposition Time", rec_info.get("decomposition_time", "N/A"))
-        with c3:
-            st.metric("Carbon Offset", f"~{rec_info.get('co2_saved_kg', 0.0)} kg CO2")
+        
+        rec_val = rec_info.get("recyclable", "N/A")
+        time_val = rec_info.get("decomposition_time", "N/A")
+        carbon_val = f"~{rec_info.get('co2_saved_kg', 0.0)} kg CO2"
+        
+        st.markdown(f"""
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 20px;">
+            <div style="background-color: #172030; border: 1px solid #2d3d5a; border-radius: 10px; padding: 20px; text-align: center; height: auto;">
+                <div style="font-size: 14px; text-transform: uppercase; color: #9ca3af; font-weight: 600; margin-bottom: 8px;">Recyclable?</div>
+                <div style="font-size: 26px; font-weight: 800; color: #10b981; line-height: 1.2; white-space: normal; word-break: break-word; overflow-wrap: break-word;">{rec_val}</div>
+            </div>
+            <div style="background-color: #172030; border: 1px solid #2d3d5a; border-radius: 10px; padding: 20px; text-align: center; height: auto;">
+                <div style="font-size: 14px; text-transform: uppercase; color: #9ca3af; font-weight: 600; margin-bottom: 8px;">Decomposition Time</div>
+                <div style="font-size: 26px; font-weight: 800; color: #3b82f6; line-height: 1.2; white-space: normal; word-break: break-word; overflow-wrap: break-word;">{time_val}</div>
+            </div>
+            <div style="background-color: #172030; border: 1px solid #2d3d5a; border-radius: 10px; padding: 20px; text-align: center; height: auto;">
+                <div style="font-size: 14px; text-transform: uppercase; color: #9ca3af; font-weight: 600; margin-bottom: 8px;">Carbon Offset</div>
+                <div style="font-size: 26px; font-weight: 800; color: #10b981; line-height: 1.2; white-space: normal; word-break: break-word; overflow-wrap: break-word;">{carbon_val}</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
         st.info(f"💡 **Fun Fact:** {rec_info.get('fun_fact', '')}")
 
-        # Row 3 (full width): Do's and Don'ts in two equal columns
+        # Row 4 (full width): Do's and Don'ts in two equal columns
         st.markdown("### 📋 Disposal Guidance")
         col_do, col_dont = st.columns(2)
         with col_do:
@@ -502,10 +522,21 @@ if app_view == "📸 Prediction Workspace":
             for dont_item in rec_info.get("donts", []):
                 st.markdown(f"<div class='dont-card'>❌ {dont_item}</div>", unsafe_allow_html=True)
 
-        # Row 4 (full width): Environmental Impact Section
+        # Row 5 (full width): Environmental Impact Section
+        st.markdown("---")
         st.markdown("## 🌍 Environmental Impact")
-        st.metric("Impact Score (0 - 100)", f"{env_info.get('impact_score', 0)}/100")
-        st.progress(env_info.get("impact_score", 0) / 100)
+        
+        impact_score = env_info.get('impact_score', 0)
+        st.markdown(f"""
+        <div style="display: grid; grid-template-columns: 1fr; gap: 20px; margin-bottom: 20px;">
+            <div style="background-color: #172030; border: 1px solid #2d3d5a; border-radius: 10px; padding: 20px; text-align: center; height: auto;">
+                <div style="font-size: 14px; text-transform: uppercase; color: #9ca3af; font-weight: 600; margin-bottom: 8px;">Environmental Impact Score</div>
+                <div style="font-size: 32px; font-weight: 800; color: #ef4444; line-height: 1.2; white-space: normal; word-break: break-word; overflow-wrap: break-word;">{impact_score}/100</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.progress(impact_score / 100)
         st.markdown(
             f"<div style='background-color:{env_info.get('impact_color')}; padding:12px; border-radius:8px; color:white; font-weight:bold; text-align:center; margin-bottom: 12px;'>"
             f"Severity Classification: {env_info.get('impact_class')} Impact"

@@ -44,25 +44,40 @@ def find_last_conv_layer(model) -> str:
 
     Returns
     -------
-    str : Name of the last Conv2D layer
+    str : Name of the last Conv2D or Activation layer
     """
     if not TF_AVAILABLE:
         return None
 
+    # Known final layers of standard architectures (prioritize actual final conv layers)
+    known_final_layers = [
+        "conv5_block3_3_conv",    # ResNet50 last conv layer (sharper features)
+        "conv5_block3_out",       # ResNet50 final activation of final block
+        "out_relu",               # MobileNetV2 final activation
+        "block_16_project",       # MobileNetV2 project layer
+        "top_activation",         # EfficientNet final activation
+        "block14_sepconv2_act",   # Xception final activation
+    ]
+
+    for name in known_final_layers:
+        try:
+            _get_nested_layer(model, name)
+            return name
+        except ValueError:
+            continue
+
     last_conv_name = None
 
-    # Search through all layers (including nested models)
-    for layer in model.layers:
-        # If layer is a Model (e.g., MobileNetV2 base), search within it
+    # Fallback: Search backwards through all layers (including nested models) to find the last Conv2D
+    for layer in reversed(model.layers):
+        if isinstance(layer, tf.keras.layers.Conv2D):
+            return layer.name
         if hasattr(layer, "layers"):
-            for sub_layer in layer.layers:
-                if isinstance(sub_layer, (tf.keras.layers.Conv2D,)):
-                    last_conv_name = sub_layer.name
-                # MobileNetV2's final activation layer
+            for sub_layer in reversed(layer.layers):
+                if isinstance(sub_layer, tf.keras.layers.Conv2D):
+                    return sub_layer.name
                 if sub_layer.name in ("out_relu", "conv5_block3_3_relu", "post_relu"):
-                    last_conv_name = sub_layer.name
-        elif isinstance(layer, tf.keras.layers.Conv2D):
-            last_conv_name = layer.name
+                    return sub_layer.name
 
     return last_conv_name
 
@@ -123,62 +138,111 @@ def generate_gradcam_heatmap(
     if conv_layer_name is None:
         conv_layer_name = find_last_conv_layer(model)
         if conv_layer_name is None:
+            print("[Grad-CAM Diagnostic] Error: No suitable conv layer found!")
             return np.ones((7, 7), dtype=np.float32) * 0.5
 
-    # Build a sub-model that outputs both conv features and predictions
-    try:
-        # For models with nested base models (transfer learning)
-        target_layer = _get_nested_layer(model, conv_layer_name)
+    # Check if we have a nested base model (e.g. resnet50, mobilenetv2)
+    base_model = None
+    for layer in model.layers:
+        if hasattr(layer, "layers") and isinstance(layer, tf.keras.Model):
+            base_model = layer
+            break
 
-        # Build the gradient model
-        # We need the conv layer output AND the model predictions
-        grad_model = tf.keras.Model(
-            inputs=model.input,
-            outputs=[target_layer.output, model.output],
-        )
-    except Exception:
-        # Fallback: try direct model layer access
-        try:
+    # Temporarily set main model's last layer activation to linear for logits-based gradients
+    last_layer = model.layers[-1]
+    original_activation = last_layer.activation if hasattr(last_layer, "activation") else None
+    if hasattr(last_layer, "activation"):
+        last_layer.activation = tf.keras.activations.linear
+
+    try:
+        img_tensor = tf.cast(img_array, tf.float32)
+
+        if base_model is not None:
+            # Reconstruct the forward pass of the main model to enable gradient flow through functional sub-models
+            target_layer = _get_nested_layer(base_model, conv_layer_name)
+            
+            # Sub-model for the base backbone
+            base_grad_model = tf.keras.Model(
+                inputs=base_model.input,
+                outputs=[target_layer.output, base_model.output]
+            )
+            
+            # Extract main model head layers after base model
+            head_layers = []
+            found_base = False
+            for layer in model.layers:
+                if layer == base_model:
+                    found_base = True
+                    continue
+                if found_base:
+                    head_layers.append(layer)
+            
+            def run_head(x):
+                for hl in head_layers:
+                    x = hl(x)
+                return x
+
+            with tf.GradientTape() as tape:
+                tape.watch(img_tensor)
+                conv_outputs, base_features = base_grad_model(img_tensor)
+                predictions = run_head(base_features)
+                
+                if target_class_idx is None:
+                    target_class_idx = tf.argmax(predictions[0]).numpy()
+                loss = predictions[:, target_class_idx]
+                
+            grads = tape.gradient(loss, conv_outputs)
+        else:
+            # Standard flat model execution
+            target_layer = _get_nested_layer(model, conv_layer_name)
             grad_model = tf.keras.Model(
                 inputs=model.input,
-                outputs=[model.get_layer(conv_layer_name).output, model.output],
+                outputs=[target_layer.output, model.output]
             )
-        except Exception:
+            with tf.GradientTape() as tape:
+                tape.watch(img_tensor)
+                conv_outputs, predictions = grad_model(img_tensor)
+                if target_class_idx is None:
+                    target_class_idx = tf.argmax(predictions[0]).numpy()
+                loss = predictions[:, target_class_idx]
+            grads = tape.gradient(loss, conv_outputs)
+
+        if grads is None:
+            print("[Grad-CAM Diagnostic] Error: Gradients are None!")
             return np.ones((7, 7), dtype=np.float32) * 0.5
 
-    # Compute gradients
-    img_tensor = tf.cast(img_array, tf.float32)
+        # Global average pooling of gradients → channel importance weights
+        pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
 
-    with tf.GradientTape() as tape:
-        tape.watch(img_tensor)
-        conv_outputs, predictions = grad_model(img_tensor)
+        # Weight the conv outputs by gradient importance
+        conv_outputs_val = conv_outputs[0]
+        heatmap_tensor = tf.reduce_sum(conv_outputs_val * pooled_grads, axis=-1)
 
-        if target_class_idx is None:
-            target_class_idx = tf.argmax(predictions[0]).numpy()
+        # ReLU — only keep positive contributions
+        heatmap_tensor = tf.maximum(heatmap_tensor, 0)
 
-        loss = predictions[:, target_class_idx]
+        # Normalize to [0, 1] using TensorFlow operations
+        max_val = tf.math.reduce_max(heatmap_tensor)
+        if max_val > 1e-8:
+            heatmap_tensor = heatmap_tensor / max_val
+        else:
+            heatmap_tensor = tf.zeros_like(heatmap_tensor)
 
-    # Compute gradients of the loss w.r.t. conv layer outputs
-    grads = tape.gradient(loss, conv_outputs)
+        # Convert to numpy array
+        heatmap = heatmap_tensor.numpy()
 
-    if grads is None:
-        return np.ones((7, 7), dtype=np.float32) * 0.5
+        # Print diagnostics to log stream
+        print(f"[Grad-CAM Diagnostic] Target Class Index: {target_class_idx}")
+        print(f"[Grad-CAM Diagnostic] Selected Layer Name: {conv_layer_name}")
+        print(f"[Grad-CAM Diagnostic] Gradients Min/Max: {grads.numpy().min():.6f}/{grads.numpy().max():.6f}")
+        print(f"[Grad-CAM Diagnostic] Heatmap Min/Max: {heatmap.min():.6f}/{heatmap.max():.6f}")
 
-    # Global average pooling of gradients → channel importance weights
-    pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
+        return heatmap
 
-    # Weight the conv outputs by gradient importance
-    conv_outputs = conv_outputs[0]
-    heatmap = tf.reduce_sum(conv_outputs * pooled_grads, axis=-1).numpy()
-
-    # ReLU — only keep positive contributions
-    heatmap = np.maximum(heatmap, 0)
-
-    # Normalize to [0, 1]
-    if heatmap.max() != 0:
-        heatmap = heatmap / heatmap.max()
-
-    return heatmap
+    finally:
+        # Restore original activation function
+        if original_activation is not None and hasattr(last_layer, "activation"):
+            last_layer.activation = original_activation
 
 
 def overlay_heatmap_on_image(
@@ -190,6 +254,8 @@ def overlay_heatmap_on_image(
 ) -> np.ndarray:
     """
     Superimpose a Grad-CAM heatmap onto the original image.
+    Uses variable alpha blending based on heatmap intensity to ensure
+    background areas remain transparent and clean.
 
     Parameters
     ----------
@@ -237,10 +303,17 @@ def overlay_heatmap_on_image(
         else:
             original_image = original_image.astype(np.uint8)
 
-    # Blend
-    superimposed = cv2.addWeighted(
-        original_image, 1 - alpha, heatmap_colored, alpha, 0
-    )
+    # Blend with variable intensity based on heatmap values
+    # mask has shape (H, W, 1), values in [0, 1]
+    mask = np.expand_dims(heatmap_resized, axis=-1)
+    
+    # Convert arrays to float for interpolation calculations
+    original_float = original_image.astype(np.float32)
+    heatmap_colored_float = heatmap_colored.astype(np.float32)
+    
+    # Blend: original * (1 - alpha * mask) + heatmap_colored * (alpha * mask)
+    blended = original_float * (1.0 - alpha * mask) + heatmap_colored_float * (alpha * mask)
+    superimposed = np.clip(blended, 0, 255).astype(np.uint8)
 
     return superimposed
 
@@ -411,8 +484,15 @@ def explain_prediction(
 
     pred_class = class_names[pred_idx]
 
-    # Generate Grad-CAM heatmap
-    heatmap = generate_gradcam_heatmap(model, img_batch, target_class_idx=pred_idx)
+    # Generate Grad-CAM heatmap (resolve conv layer name for logs)
+    conv_layer_name = find_last_conv_layer(model)
+    heatmap = generate_gradcam_heatmap(model, img_batch, target_class_idx=pred_idx, conv_layer_name=conv_layer_name)
+
+    # Print diagnostics for debugging
+    print(f"[Grad-CAM Diagnostic] Predicted Class: {pred_class}")
+    print(f"[Grad-CAM Diagnostic] Confidence: {confidence:.4f}")
+    print(f"[Grad-CAM Diagnostic] Selected Grad-CAM Layer: {conv_layer_name}")
+    print(f"[Grad-CAM Diagnostic] Heatmap Min/Max: {heatmap.min():.4f}/{heatmap.max():.4f}")
 
     # Create overlay
     overlay = overlay_heatmap_on_image(pil_image, heatmap)

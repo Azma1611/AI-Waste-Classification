@@ -8,6 +8,8 @@ from PIL import Image
 import google.generativeai as genai
 import os
 import recommendation_engine
+import gradcam
+
 
 # TensorFlow is optional — app runs in demo mode if unavailable (e.g. Python 3.14 cloud)
 try:
@@ -33,6 +35,21 @@ st.set_page_config(
 # Dark theme custom CSS
 st.markdown("""
 <style>
+    .reportview-container {
+        background-color: #0b0f19;
+    }
+    .metric-card {
+        background-color: #172030;
+        border: 1px solid #2d3d5a;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    }
+    .metric-card h2, .metric-card h4, .metric-card span {
+        white-space: normal !important;
+        word-break: break-word !important;
+        overflow-wrap: break-word !important;
+    }
     .do-card {
         background-color: rgba(16, 185, 129, 0.08);
         border-left: 5px solid #10b981;
@@ -74,6 +91,11 @@ st.markdown("""
         word-break: break-word !important;
         overflow-wrap: break-word !important;
         text-overflow: clip !important;
+    }
+    [data-testid="stImage"] img {
+        max-height: 350px !important;
+        object-fit: contain !important;
+        border-radius: 8px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -179,77 +201,7 @@ IMPACT_COLORS = {
     "Critical": "#e63946",
 }
 
-# ==============================================================================
-# 4. STEP 8: EXPLAINABLE AI ENGINE (GRAD-CAM)
-# ==============================================================================
-def compute_gradcam_heatmap(img_array, model, base_backbone):
-    """Generates Grad-CAM heatmap. Returns placeholder if TF unavailable."""
-    if not TF_AVAILABLE or model is None:
-        return np.random.rand(7, 7)   # demo placeholder heatmap
-    
-    def get_layer_nested(m, name):
-        try:
-            return m.get_layer(name)
-        except ValueError:
-            pass
-        for layer in m.layers:
-            if hasattr(layer, "layers"):
-                try:
-                    return layer.get_layer(name)
-                except ValueError:
-                    continue
-        return None
-
-    try:
-        # Search for out_relu layer inside the model
-        last_conv_layer = None
-        for name in ["out_relu", "conv5_block3_3_relu", "post_relu"]:
-            last_conv_layer = get_layer_nested(model, name)
-            if last_conv_layer is not None:
-                break
-        
-        if last_conv_layer is None:
-            # Try to find any Conv2D layer
-            for layer in model.layers:
-                if hasattr(layer, "layers"):
-                    for sub in layer.layers:
-                        if isinstance(sub, tf.keras.layers.Conv2D):
-                            last_conv_layer = sub
-                elif isinstance(layer, tf.keras.layers.Conv2D):
-                    last_conv_layer = layer
-        
-        if last_conv_layer is None:
-            return np.ones((7, 7))
-
-        grad_model = tf.keras.models.Model(
-            inputs=model.input,
-            outputs=[last_conv_layer.output, model.output],
-        )
-        with tf.GradientTape() as tape:
-            conv_outputs, predictions = grad_model(img_array)
-            pred_index = tf.argmax(predictions[0])
-            loss       = predictions[:, pred_index]
-
-        grads        = tape.gradient(loss, conv_outputs)
-        guided_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
-        conv_outputs = conv_outputs[0]
-        heatmap      = np.dot(conv_outputs.numpy(), guided_grads.numpy())
-        heatmap      = np.maximum(heatmap, 0)
-        if np.max(heatmap) != 0:
-            heatmap /= np.max(heatmap)
-        return heatmap
-    except Exception:
-        return np.ones((7, 7))
-
-
-def overlay_gradcam(pil_image: Image.Image, heatmap: np.ndarray) -> np.ndarray:
-    """Superimpose a colour Grad-CAM heatmap on the original image."""
-    img_rgb     = np.array(pil_image.resize((224, 224)).convert("RGB"))
-    heatmap_big = cv2.resize(heatmap, (224, 224))
-    heatmap_col = cv2.applyColorMap(np.uint8(255 * heatmap_big), cv2.COLORMAP_JET)
-    heatmap_col = cv2.cvtColor(heatmap_col, cv2.COLOR_BGR2RGB)
-    superimposed = cv2.addWeighted(img_rgb, 0.60, heatmap_col, 0.40, 0)
-    return superimposed
+# Section 4: Explainable AI is imported from gradcam.py
 
 
 # ==============================================================================
@@ -505,7 +457,7 @@ elif app_mode == "📸 Live Classification Workspace":
                     pred_idx     = int(np.argmax(predictions))
                     confidence   = float(predictions[pred_idx])
                     pred_class   = classes[pred_idx]
-                    heatmap      = compute_gradcam_heatmap(img_batch, model, base_backbone)
+                    heatmap      = gradcam.generate_gradcam_heatmap(model, img_batch, target_class_idx=pred_idx)
                 else:
                     import random
                     pred_idx    = random.randint(0, 5)
@@ -581,9 +533,13 @@ elif app_mode == "📸 Live Classification Workspace":
                 st.session_state.pred_class = pred_class # Update cached class state too
 
             # ── Prediction Header ─────────────────────────────────────────────
-            st.metric(
-                label=f"Classified As: {pred_class}",
-                value=f"{confidence * 100:.1f}% Confidence",
+            st.markdown(
+                f"<div class='metric-card' style='margin-bottom: 15px;'>"
+                f"<span style='font-size:14px; text-transform:uppercase; color:#9ca3af; font-weight:600;'>AI Classification Result</span>"
+                f"<h2 style='margin:0; color:#10b981; font-weight:800;'>{pred_class}</h2>"
+                f"<h4 style='margin:0 0 10px 0; color:#3b82f6;'>{confidence * 100:.1f}% Confidence</h4>"
+                f"</div>",
+                unsafe_allow_html=True
             )
             st.progress(confidence)
 
@@ -600,12 +556,6 @@ elif app_mode == "📸 Live Classification Workspace":
                 use_container_width=True,
             )
 
-            # ── Explainable AI inside Row 1 Right Column ──────────────────────
-            st.write("**Explainable AI — Grad-CAM Heatmap**")
-            st.caption("Highlighted regions show where the model focused its attention.")
-            superimposed = overlay_gradcam(pil_img, heatmap)
-            st.image(superimposed, caption="Grad-CAM Activation Map", use_container_width=True)
-
         elif not uploaded_file:
             st.markdown("""
             **How it works:**
@@ -621,12 +571,13 @@ elif app_mode == "📸 Live Classification Workspace":
     # ── Full-Width Sections Below the Columns ───────────────────────────
     if uploaded_file and st.session_state.uploaded_file_name == uploaded_file.name:
         pred_class = st.session_state.pred_class
+        heatmap = st.session_state.heatmap
 
         # Load full recommendations from the centralized engine
         rec_info = recommendation_engine.get_recommendation(pred_class)
         
         rec = rec_info.get("recyclable", "N/A")
-        time = rec_info.get("decomposition_time", "N/A")
+        time_val = rec_info.get("decomposition_time", "N/A")
         impact = rec_info.get("impact_level", "N/A")
         carbon = rec_info.get("co2_saved_kg", 0.0)
         tip = rec_info.get("disposal_instructions", ["No tips available"])[0]
@@ -635,19 +586,40 @@ elif app_mode == "📸 Live Classification Workspace":
         impact_map   = {"Low": 20, "Medium": 50, "High": 75, "Critical": 100}
         impact_score = impact_map.get(impact, 50)
 
-        # ── Row 2 (full width): Recycling Recommendations ──
+        # ── Row 2 (full width): Grad-CAM Explainability ──
+        st.markdown("---")
+        st.markdown("## 🔬 Explainable AI — Grad-CAM Heatmap")
+        st.caption("Highlighted regions show where the model focused its attention to classify the waste object.")
+        superimposed = gradcam.overlay_heatmap_on_image(pil_img, heatmap, alpha=0.4)
+        st.image(superimposed, caption="Grad-CAM Activation Map Overlay (Alpha=0.4)", use_container_width=True)
+
+        # ── Row 3 (full width): Recycling Recommendations ──
         st.markdown("---")
         st.markdown("## ♻️ Recycling Recommendations")
-        rec_col1, rec_col2, rec_col3 = st.columns(3)
-        rec_col1.metric("Recyclable?",      rec)
-        rec_col2.metric("Decomposition Time", time)
-        rec_col3.metric("Carbon Offset",    f"~{carbon} kg CO2")
+        
+        carbon_val = f"~{carbon} kg CO2"
+        st.markdown(f"""
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 20px;">
+            <div style="background-color: #172030; border: 1px solid #2d3d5a; border-radius: 10px; padding: 20px; text-align: center; height: auto;">
+                <div style="font-size: 14px; text-transform: uppercase; color: #9ca3af; font-weight: 600; margin-bottom: 8px;">Recyclable?</div>
+                <div style="font-size: 26px; font-weight: 800; color: #10b981; line-height: 1.2; white-space: normal; word-break: break-word; overflow-wrap: break-word;">{rec}</div>
+            </div>
+            <div style="background-color: #172030; border: 1px solid #2d3d5a; border-radius: 10px; padding: 20px; text-align: center; height: auto;">
+                <div style="font-size: 14px; text-transform: uppercase; color: #9ca3af; font-weight: 600; margin-bottom: 8px;">Decomposition Time</div>
+                <div style="font-size: 26px; font-weight: 800; color: #3b82f6; line-height: 1.2; white-space: normal; word-break: break-word; overflow-wrap: break-word;">{time_val}</div>
+            </div>
+            <div style="background-color: #172030; border: 1px solid #2d3d5a; border-radius: 10px; padding: 20px; text-align: center; height: auto;">
+                <div style="font-size: 14px; text-transform: uppercase; color: #9ca3af; font-weight: 600; margin-bottom: 8px;">Carbon Offset</div>
+                <div style="font-size: 26px; font-weight: 800; color: #10b981; line-height: 1.2; white-space: normal; word-break: break-word; overflow-wrap: break-word;">{carbon_val}</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
         
         st.info(f"💡 **Tip:** {tip}")
         if "fun_fact" in rec_info:
             st.info(f"💡 **Fun Fact:** {rec_info['fun_fact']}")
 
-        # ── Row 3 (full width): Do's and Don'ts Lists ──
+        # ── Row 4 (full width): Do's and Don'ts Lists ──
         st.markdown("### 📋 Disposal Guidance")
         col_do, col_dont = st.columns(2)
         with col_do:
@@ -659,9 +631,19 @@ elif app_mode == "📸 Live Classification Workspace":
             for dont_item in rec_info.get("donts", []):
                 st.markdown(f"<div class='dont-card'>❌ {dont_item}</div>", unsafe_allow_html=True)
 
-        # ── Row 4 (full width): Environmental Impact Section ──
+        # ── Row 5 (full width): Environmental Impact Section ──
+        st.markdown("---")
         st.markdown("## 🌍 Environmental Impact")
-        st.metric("Impact Score (0 - 100)", f"{impact_score}/100")
+        
+        st.markdown(f"""
+        <div style="display: grid; grid-template-columns: 1fr; gap: 20px; margin-bottom: 20px;">
+            <div style="background-color: #172030; border: 1px solid #2d3d5a; border-radius: 10px; padding: 20px; text-align: center; height: auto;">
+                <div style="font-size: 14px; text-transform: uppercase; color: #9ca3af; font-weight: 600; margin-bottom: 8px;">Environmental Impact Score</div>
+                <div style="font-size: 32px; font-weight: 800; color: #ef4444; line-height: 1.2; white-space: normal; word-break: break-word; overflow-wrap: break-word;">{impact_score}/100</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
         st.progress(impact_score / 100)
         st.markdown(
             f"<div style='background:{imp_color}; padding:12px; border-radius:8px; "
