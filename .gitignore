@@ -3,7 +3,6 @@ __pycache__/
 *.pyc
 .gradio/
 data/
-model/results/
 model/temp_*.keras
 dataset/
 *.log

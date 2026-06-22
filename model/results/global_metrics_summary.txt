@@ -1,0 +1,6 @@
+AI-Powered Smart Waste Classifier - Global Metrics
+==================================================
+Test Accuracy : 87.40%
+Precision     : 0.8762
+Recall        : 0.8740
+F1-Score      : 0.8748

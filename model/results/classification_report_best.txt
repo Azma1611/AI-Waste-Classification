@@ -1,0 +1,12 @@
+               precision    recall  f1-score   support
+
+      Plastic       0.77      0.83      0.80       141
+        Paper       0.91      0.89      0.90       166
+        Glass       0.79      0.83      0.81        99
+        Metal       0.86      0.87      0.86       157
+Organic Waste       0.91      0.89      0.90        96
+      E-Waste       0.92      0.90      0.91       389
+
+     accuracy                           0.87      1048
+    macro avg       0.86      0.87      0.86      1048
+ weighted avg       0.88      0.87      0.87      1048

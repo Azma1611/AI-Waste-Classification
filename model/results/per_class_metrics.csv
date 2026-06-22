@@ -1,0 +1,7 @@
+Class Name,Precision,Recall,F1-Score,Support (Images)
+Plastic,0.7697,0.8298,0.7986,141
+Paper,0.9074,0.8855,0.8963,166
+Glass,0.7885,0.8283,0.8079,99
+Metal,0.8608,0.8662,0.8635,157
+Organic Waste,0.914,0.8854,0.8995,96
+E-Waste,0.9208,0.8972,0.9089,389
