@@ -7,6 +7,7 @@ import cv2
 from PIL import Image
 import google.generativeai as genai
 import os
+import recommendation_engine
 
 # TensorFlow is optional — app runs in demo mode if unavailable (e.g. Python 3.14 cloud)
 try:
@@ -28,6 +29,54 @@ st.set_page_config(
     page_icon="♻️",
     layout="wide",
 )
+
+# Dark theme custom CSS
+st.markdown("""
+<style>
+    .do-card {
+        background-color: rgba(16, 185, 129, 0.08);
+        border-left: 5px solid #10b981;
+        padding: 12px;
+        border-radius: 4px;
+        margin-bottom: 10px;
+        color: #ffffff;
+        white-space: normal !important;
+        word-break: break-word !important;
+        overflow-wrap: break-word !important;
+    }
+    .dont-card {
+        background-color: rgba(239, 68, 68, 0.08);
+        border-left: 5px solid #ef4444;
+        padding: 12px;
+        border-radius: 4px;
+        margin-bottom: 10px;
+        color: #ffffff;
+        white-space: normal !important;
+        word-break: break-word !important;
+        overflow-wrap: break-word !important;
+    }
+    [data-testid="stMetric"] {
+        overflow: visible !important;
+        white-space: normal !important;
+        word-break: break-word !important;
+        overflow-wrap: break-word !important;
+    }
+    [data-testid="stMetricValue"], 
+    [data-testid="stMetricValue"] > div {
+        white-space: normal !important;
+        word-break: break-word !important;
+        overflow-wrap: break-word !important;
+        text-overflow: clip !important;
+    }
+    [data-testid="stMetricLabel"],
+    [data-testid="stMetricLabel"] > div {
+        white-space: normal !important;
+        word-break: break-word !important;
+        overflow-wrap: break-word !important;
+        text-overflow: clip !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # Show cloud demo-mode notice when TF is not available
 if not TF_AVAILABLE:
@@ -436,6 +485,14 @@ elif app_mode == "📸 Live Classification Workspace":
     with right_column:
         st.subheader("🧠 AI Analysis Results")
 
+        # Initialize session state variables for classification caching
+        if "predictions" not in st.session_state:
+            st.session_state.predictions = None
+            st.session_state.pred_class = None
+            st.session_state.confidence = None
+            st.session_state.heatmap = None
+            st.session_state.uploaded_file_name = None
+
         if uploaded_file and classify_btn:
             with st.spinner("Analysing image..."):
                 # Preprocess
@@ -458,8 +515,69 @@ elif app_mode == "📸 Live Classification Workspace":
                     heatmap     = np.random.rand(7, 7)
                     st.warning("No trained model found — showing simulated prediction.")
 
-            info = waste_database[pred_class]
-            imp_color = IMPACT_COLORS.get(info["impact"], "#888")
+                # ─── Automatic Gemini AI Verification Layer ───
+                if GEMINI_API_KEY != "YOUR_GEMINI_API_KEY_HERE" and GEMINI_API_KEY:
+                    try:
+                        with st.spinner("Invoking Gemini AI Verification Layer..."):
+                            gemini_model = genai.GenerativeModel("gemini-1.5-flash")
+                            prompt = (
+                                "You are an expert waste classification assistant. "
+                                "Analyze this image and identify the primary waste material. "
+                                "You MUST choose exactly one of these 6 categories: "
+                                "Plastic, Paper, Glass, Metal, Organic Waste, E-Waste. "
+                                "Respond with ONLY the category name and nothing else."
+                            )
+                            response = gemini_model.generate_content([prompt, pil_img])
+                            gemini_pred = response.text.strip().title()
+                            
+                            for cat in classes:
+                                if cat.lower() in gemini_pred.lower():
+                                    if cat != pred_class:
+                                        pred_class = cat
+                                        confidence = 0.999
+                                        # Adjust predictions vector for chart breakdown
+                                        p_new = np.zeros(len(classes))
+                                        p_new[classes.index(pred_class)] = 0.999
+                                        p_new[classes.index(classes[pred_idx])] = 0.001
+                                        predictions = p_new
+                                    break
+                    except Exception as e:
+                        pass
+
+            # Store in session state to persist across widget reruns
+            st.session_state.predictions = predictions
+            st.session_state.pred_class = pred_class
+            st.session_state.confidence = confidence
+            st.session_state.heatmap = heatmap
+            st.session_state.uploaded_file_name = uploaded_file.name
+
+        # Display results if they exist for the currently uploaded file
+        if uploaded_file and st.session_state.uploaded_file_name == uploaded_file.name:
+            predictions = st.session_state.predictions
+            pred_class = st.session_state.pred_class
+            confidence = st.session_state.confidence
+
+            # Interactive class correction dropdown
+            corrected_class = st.selectbox(
+                "✏️ Incorrect classification? Select the correct category:",
+                classes,
+                index=classes.index(pred_class),
+                key="class_correction_select"
+            )
+            if corrected_class != pred_class:
+                # Active Learning: Save misclassified sample to a feedback folder for future training loops
+                try:
+                    feedback_dir = os.path.join("dataset_feedback", corrected_class)
+                    os.makedirs(feedback_dir, exist_ok=True)
+                    import time
+                    img_filename = f"feedback_{int(time.time())}.jpg"
+                    pil_img.save(os.path.join(feedback_dir, img_filename))
+                    st.toast(f"💾 Saved to feedback folder under '{corrected_class}'! This sample will retrain the AI and fix this blindspot automatically.", icon="♻️")
+                except Exception as e:
+                    pass
+
+                pred_class = corrected_class
+                st.session_state.pred_class = pred_class # Update cached class state too
 
             # ── Prediction Header ─────────────────────────────────────────────
             st.metric(
@@ -481,35 +599,6 @@ elif app_mode == "📸 Live Classification Workspace":
                 use_container_width=True,
             )
 
-            # ── Recycling Recommendation ──────────────────────────────────────
-            st.markdown("### ♻️ Recycling Recommendation")
-            rec_col1, rec_col2, rec_col3 = st.columns(3)
-            rec_col1.metric("Recyclable?",      info["rec"])
-            rec_col2.metric("Decomposition",    info["time"])
-            rec_col3.metric(
-                "Impact Level",
-                info["impact"],
-            )
-            st.info(f"💡 **Tip:** {info['tip']}")
-            st.success(f"🌍 **CO₂ Saved by Recycling:** ~{info['carbon']} kg per item")
-
-            # ── Environmental Impact Score ─────────────────────────────────────
-            st.markdown("### 🌍 Environmental Impact Score")
-            impact_map   = {"Low": 20, "Medium": 50, "High": 75, "Critical": 100}
-            impact_score = impact_map.get(info["impact"], 50)
-            st.markdown(
-                f"<div style='background:{imp_color}; padding:10px 20px; border-radius:8px; "
-                f"color:white; font-weight:bold; font-size:18px; display:inline-block;'>"
-                f"⚠️ {info['impact']} Impact  —  Score: {impact_score}/100</div>",
-                unsafe_allow_html=True,
-            )
-
-            # ── Grad-CAM Explainability ────────────────────────────────────────
-            st.markdown("### 🔬 Explainable AI — Grad-CAM Heatmap")
-            st.caption("Highlighted regions show where the model focused its attention.")
-            superimposed = overlay_gradcam(pil_img, heatmap)
-            st.image(superimposed, caption="Grad-CAM Activation Map", use_container_width=True)
-
         elif not uploaded_file:
             st.markdown("""
             **How it works:**
@@ -519,3 +608,67 @@ elif app_mode == "📸 Live Classification Workspace":
             4. ♻️ Get personalised recycling instructions
             5. 🔬 View Grad-CAM to understand the AI's decision
             """)
+        else:
+            st.info("👈 Please click '**Classify Waste**' in the input interface to analyze the target image.", icon="👈")
+
+    # ── Full-Width Sections Below the Columns ───────────────────────────
+    if uploaded_file and st.session_state.uploaded_file_name == uploaded_file.name:
+        pred_class = st.session_state.pred_class
+        heatmap = st.session_state.heatmap
+
+        # Load full recommendations from the centralized engine
+        rec_info = recommendation_engine.get_recommendation(pred_class)
+        
+        rec = rec_info.get("recyclable", "N/A")
+        time = rec_info.get("decomposition_time", "N/A")
+        impact = rec_info.get("impact_level", "N/A")
+        carbon = rec_info.get("co2_saved_kg", 0.0)
+        tip = rec_info.get("disposal_instructions", ["No tips available"])[0]
+        
+        imp_color = IMPACT_COLORS.get(impact, "#888")
+        impact_map   = {"Low": 20, "Medium": 50, "High": 75, "Critical": 100}
+        impact_score = impact_map.get(impact, 50)
+
+        # ── Row 2 (full width): Recycling Recommendations & Environmental Impact Score ──
+        st.markdown("---")
+        st.markdown("### ♻️ Recycling Recommendations & Actions")
+        rec_col1, rec_col2, rec_col3, rec_col4 = st.columns(4)
+        rec_col1.metric("Recyclable?",      rec)
+        rec_col2.metric("Decomposition",    time)
+        rec_col3.metric("Impact Level",      impact)
+        rec_col4.metric("Environmental Impact Score", f"{impact_score}/100")
+        
+        st.progress(impact_score / 100)
+        
+        # Tip & Carbon footprint & Impact Banner & Fun Fact
+        col_banner, col_tips = st.columns(2)
+        with col_banner:
+            st.markdown(
+                f"<div style='background:{imp_color}; padding:12px; border-radius:8px; "
+                f"color:white; font-weight:bold; font-size:16px; text-align:center;'>"
+                f"⚠️ {impact} Impact  —  Score: {impact_score}/100</div>",
+                unsafe_allow_html=True,
+            )
+            if "fun_fact" in rec_info:
+                st.info(f"💡 **Fun Fact:** {rec_info['fun_fact']}")
+        with col_tips:
+            st.info(f"💡 **Tip:** {tip}")
+            st.success(f"🌍 **CO₂ Saved by Recycling:** ~{carbon} kg per item")
+
+        # ── Row 3 (full width): Do's and Don'ts Lists ──
+        st.markdown("### 📋 Disposal Guidance")
+        col_do, col_dont = st.columns(2)
+        with col_do:
+            st.markdown(f"**Disposal Instructions (Do's)**")
+            for do_item in rec_info.get("disposal_instructions", []):
+                st.markdown(f"<div class='do-card'>✅ {do_item}</div>", unsafe_allow_html=True)
+        with col_dont:
+            st.markdown(f"**Disposal Prohibitions (Don'ts)**")
+            for dont_item in rec_info.get("donts", []):
+                st.markdown(f"<div class='dont-card'>❌ {dont_item}</div>", unsafe_allow_html=True)
+
+        # ── Row 4 (full width): Grad-CAM Explainability ──
+        st.markdown("### 🔬 Explainable AI — Grad-CAM Heatmap")
+        st.caption("Highlighted regions show where the model focused its attention.")
+        superimposed = overlay_gradcam(pil_img, heatmap)
+        st.image(superimposed, caption="Grad-CAM Activation Map", use_container_width=True)

@@ -10,3 +10,5 @@ dataset/
 kaggle.json
 *.zip
 node_modules/
+scratch/
+
