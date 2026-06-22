@@ -53,6 +53,16 @@ def build_and_compile_assignment_model():
         st.sidebar.warning("⚠️ TensorFlow unavailable — running in demo mode.")
         return None, None
     try:
+        model_path = os.path.join("model", "waste_model.keras")
+        if os.path.exists(model_path):
+            size_bytes = os.path.getsize(model_path)
+            if size_bytes < 1000:
+                st.sidebar.error("⚠️ Git LFS Pointer File detected for waste_model.keras!")
+            else:
+                model = tf.keras.models.load_model(model_path)
+                st.sidebar.success("✅ Fully trained MobileNetV2 model loaded.")
+                return model, model
+
         base_model = tf.keras.applications.MobileNetV2(
             input_shape=(224, 224, 3),
             include_top=False,
@@ -68,12 +78,6 @@ def build_and_compile_assignment_model():
 
         model = tf.keras.Model(inputs, outputs, name="MobileNetV2_Waste")
         model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
-
-        # Load saved weights if available
-        model_path = os.path.join("model", "waste_model.keras")
-        if os.path.exists(model_path):
-            model.load_weights(model_path, by_name=False, skip_mismatch=True)
-            st.sidebar.success("✅ Trained model weights loaded.")
 
         return model, base_model
     except Exception as e:
@@ -131,12 +135,45 @@ IMPACT_COLORS = {
 # ==============================================================================
 def compute_gradcam_heatmap(img_array, model, base_backbone):
     """Generates Grad-CAM heatmap. Returns placeholder if TF unavailable."""
-    if not TF_AVAILABLE or model is None or base_backbone is None:
+    if not TF_AVAILABLE or model is None:
         return np.random.rand(7, 7)   # demo placeholder heatmap
+    
+    def get_layer_nested(m, name):
+        try:
+            return m.get_layer(name)
+        except ValueError:
+            pass
+        for layer in m.layers:
+            if hasattr(layer, "layers"):
+                try:
+                    return layer.get_layer(name)
+                except ValueError:
+                    continue
+        return None
+
     try:
-        last_conv_layer = base_backbone.get_layer("out_relu")
+        # Search for out_relu layer inside the model
+        last_conv_layer = None
+        for name in ["out_relu", "conv5_block3_3_relu", "post_relu"]:
+            last_conv_layer = get_layer_nested(model, name)
+            if last_conv_layer is not None:
+                break
+        
+        if last_conv_layer is None:
+            # Try to find any Conv2D layer
+            for layer in model.layers:
+                if hasattr(layer, "layers"):
+                    for sub in layer.layers:
+                        if isinstance(sub, tf.keras.layers.Conv2D):
+                            last_conv_layer = sub
+                elif isinstance(layer, tf.keras.layers.Conv2D):
+                    last_conv_layer = layer
+        
+        if last_conv_layer is None:
+            return np.ones((7, 7))
+
         grad_model = tf.keras.models.Model(
-            inputs=base_backbone.inputs,
+            inputs=model.input,
             outputs=[last_conv_layer.output, model.output],
         )
         with tf.GradientTape() as tape:

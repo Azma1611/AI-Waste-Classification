@@ -86,19 +86,39 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# ─── Model Loader ─────────────────────────────────────────────────────────────
+# ─── Model Loader & Diagnostics ────────────────────────────────────────────────
 @st.cache_resource
 def load_classification_model():
     if not TF_AVAILABLE:
         return None
+        
+    st.sidebar.subheader("🔍 Model Status")
+    st.sidebar.text(f"Path: {MODEL_PATH}")
+    
     if os.path.exists(MODEL_PATH):
+        size_bytes = os.path.getsize(MODEL_PATH)
+        size_mb = size_bytes / (1024 * 1024)
+        st.sidebar.text(f"Size: {size_mb:.2f} MB ({size_bytes} bytes)")
+        
+        # Git LFS pointer check
+        if size_bytes < 1000:
+            st.sidebar.error(
+                "⚠️ Git LFS Pointer File detected! Streamlit Cloud only cloned the "
+                "pointer text instead of the actual binary model. See logs/guide."
+            )
+            return None
+            
         try:
-            model = tf.keras.models.load_model(MODEL_PATH)
+            with st.sidebar.spinner("Loading model..."):
+                model = tf.keras.models.load_model(MODEL_PATH)
+            st.sidebar.success("✅ Model loaded successfully!")
             return model
         except Exception as e:
             st.sidebar.error(f"Error loading model file: {e}")
             return None
-    return None
+    else:
+        st.sidebar.warning("⚠️ Model file not found at path.")
+        return None
 
 
 model = load_classification_model()
@@ -106,7 +126,7 @@ model = load_classification_model()
 if not TF_AVAILABLE or model is None:
     st.sidebar.warning(
         "💡 App is running in **Simulation Mode**. A pre-trained TensorFlow model "
-        "was not detected at `model/waste_model.keras`. Inference results are simulated.",
+        "was not successfully loaded at `model/waste_model.keras`. Inference results are simulated.",
         icon="⚠️"
     )
 
