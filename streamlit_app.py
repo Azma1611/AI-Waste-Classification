@@ -588,10 +588,32 @@ elif app_mode == "📸 Live Classification Workspace":
 
         # ── Row 2 (full width): Grad-CAM Explainability ──
         st.markdown("---")
-        st.markdown("## 🔬 Explainable AI — Grad-CAM Heatmap")
-        st.caption("Highlighted regions show where the model focused its attention to classify the waste object.")
-        superimposed = gradcam.overlay_heatmap_on_image(pil_img, heatmap, alpha=0.4)
-        st.image(superimposed, caption="Grad-CAM Activation Map Overlay (Alpha=0.4)", use_container_width=True)
+        st.markdown(f"## 🔬 Explainable AI — Grad-CAM Visualizations")
+        st.markdown(f"### Highlight for Class: **{pred_class}** ({st.session_state.confidence * 100:.1f}% Confidence)")
+        st.caption("Visualizing where the network focused its attention to classify the waste object.")
+        
+        # Uniformity Check (Low Attention Localization)
+        is_uniform = np.std(heatmap) < 0.08
+        if is_uniform:
+            st.warning("⚠️ Low attention localization - model may be uncertain.", icon="⚠️")
+            
+        superimposed = gradcam.overlay_heatmap_on_image(pil_img, heatmap, alpha=0.3)
+        
+        # Colorized Heatmap only resized using cv2.INTER_LINEAR
+        h_w = pil_img.height if hasattr(pil_img, 'height') else 224
+        w_w = pil_img.width if hasattr(pil_img, 'width') else 224
+        heatmap_resized = cv2.resize(heatmap, (w_w, h_w), interpolation=cv2.INTER_LINEAR)
+        heatmap_colored = cv2.applyColorMap(np.uint8(255 * heatmap_resized), cv2.COLORMAP_JET)
+        heatmap_colored = cv2.cvtColor(heatmap_colored, cv2.COLOR_BGR2RGB)
+        
+        # Center and display side-by-side using 3 columns
+        col_img1, col_img2, col_img3 = st.columns(3)
+        with col_img1:
+            st.image(pil_img, caption="Original Image", use_container_width=True)
+        with col_img2:
+            st.image(heatmap_colored, caption="Heatmap Only (JET)", use_container_width=True)
+        with col_img3:
+            st.image(superimposed, caption="Grad-CAM Overlay (Alpha=0.3)", use_container_width=True)
 
         # ── Row 3 (full width): Recycling Recommendations ──
         st.markdown("---")

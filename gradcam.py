@@ -44,21 +44,28 @@ def find_last_conv_layer(model) -> str:
 
     Returns
     -------
-    str : Name of the last Conv2D or Activation layer
+    str : Name of the last Conv2D layer
     """
     if not TF_AVAILABLE:
         return None
 
-    # Known final layers of standard architectures (prioritize actual final conv layers)
-    known_final_layers = [
-        "conv5_block3_3_conv",    # ResNet50 last conv layer (sharper features)
-        "conv5_block3_out",       # ResNet50 final activation of final block
-        "out_relu",               # MobileNetV2 final activation
-        "block_16_project",       # MobileNetV2 project layer
-        "top_activation",         # EfficientNet final activation
-        "block14_sepconv2_act",   # Xception final activation
-    ]
+    # Search backwards through layers (including nested models) to find the last Conv2D dynamically.
+    # This automatically finds the last convolutional layer without hardcoding a name.
+    for layer in reversed(model.layers):
+        if hasattr(layer, "layers") and isinstance(layer, tf.keras.Model):
+            for sub_layer in reversed(layer.layers):
+                if isinstance(sub_layer, tf.keras.layers.Conv2D):
+                    return sub_layer.name
+        elif isinstance(layer, tf.keras.layers.Conv2D):
+            return layer.name
 
+    # Known final layers as fallback
+    known_final_layers = [
+        "conv5_block3_3_conv",
+        "conv5_block3_out",
+        "out_relu",
+        "block_16_project",
+    ]
     for name in known_final_layers:
         try:
             _get_nested_layer(model, name)
@@ -66,20 +73,7 @@ def find_last_conv_layer(model) -> str:
         except ValueError:
             continue
 
-    last_conv_name = None
-
-    # Fallback: Search backwards through all layers (including nested models) to find the last Conv2D
-    for layer in reversed(model.layers):
-        if isinstance(layer, tf.keras.layers.Conv2D):
-            return layer.name
-        if hasattr(layer, "layers"):
-            for sub_layer in reversed(layer.layers):
-                if isinstance(sub_layer, tf.keras.layers.Conv2D):
-                    return sub_layer.name
-                if sub_layer.name in ("out_relu", "conv5_block3_3_relu", "post_relu"):
-                    return sub_layer.name
-
-    return last_conv_name
+    return None
 
 
 def _get_nested_layer(model, layer_name):
@@ -219,17 +213,12 @@ def generate_gradcam_heatmap(
         heatmap_tensor = tf.reduce_sum(conv_outputs_val * pooled_grads, axis=-1)
 
         # ReLU — only keep positive contributions
-        heatmap_tensor = tf.maximum(heatmap_tensor, 0)
-
-        # Normalize to [0, 1] using TensorFlow operations
-        max_val = tf.math.reduce_max(heatmap_tensor)
-        if max_val > 1e-8:
-            heatmap_tensor = heatmap_tensor / max_val
-        else:
-            heatmap_tensor = tf.zeros_like(heatmap_tensor)
-
-        # Convert to numpy array
         heatmap = heatmap_tensor.numpy()
+        heatmap = np.maximum(heatmap, 0)
+
+        # Normalize to [0, 1] using NumPy as requested
+        heatmap_max = np.max(heatmap)
+        heatmap /= heatmap_max + 1e-8
 
         # Print diagnostics to log stream
         print(f"[Grad-CAM Diagnostic] Target Class Index: {target_class_idx}")
@@ -248,7 +237,7 @@ def generate_gradcam_heatmap(
 def overlay_heatmap_on_image(
     original_image: np.ndarray,
     heatmap: np.ndarray,
-    alpha: float = 0.4,
+    alpha: float = 0.3,
     colormap: int = cv2.COLORMAP_JET,
     target_size: tuple = (224, 224),
 ) -> np.ndarray:
@@ -287,8 +276,8 @@ def overlay_heatmap_on_image(
     if original_image.shape[:2] != target_size[::-1]:
         original_image = cv2.resize(original_image, target_size)
 
-    # Resize heatmap to match image
-    heatmap_resized = cv2.resize(heatmap, target_size)
+    # Resize heatmap to match image using cv2.INTER_LINEAR
+    heatmap_resized = cv2.resize(heatmap, target_size, interpolation=cv2.INTER_LINEAR)
 
     # Apply colormap
     heatmap_colored = cv2.applyColorMap(
