@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Waste Classification Presentation</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(23, 32, 48, 0.7);
+            --primary-color: #10b981;
+            --secondary-color: #3b82f6;
+            --text-color: #f3f4f6;
+            --text-muted: #9ca3af;
+            --border-color: #2d3d5a;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* Slide Container */
+        .slides-container {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            padding: 40px;
+        }
+
+        .slide {
+            position: absolute;
+            width: 85%;
+            height: 80%;
+            max-width: 1200px;
+            max-height: 700px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 50px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            opacity: 0;
+            transform: scale(0.95);
+            pointer-events: none;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            backdrop-filter: blur(10px);
+            overflow-y: auto;
+        }
+
+        /* Custom scrollbar for slides */
+        .slide::-webkit-scrollbar {
+            width: 8px;
+        }
+        .slide::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+        }
+        .slide::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 10px;
+        }
+        .slide::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-color);
+        }
+
+        .slide.active {
+            opacity: 1;
+            transform: scale(1);
+            pointer-events: auto;
+            z-index: 10;
+        }
+
+        /* Slide Typography */
+        .slide-header {
+            border-bottom: 2px solid rgba(16, 185, 129, 0.2);
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        .slide-header h2 {
+            font-size: 2.2rem;
+            font-weight: 800;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .slide-content {
+            flex-grow: 1;
+            font-size: 1.2rem;
+            line-height: 1.6;
+            color: #e5e7eb;
+        }
+
+        .slide-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            padding-top: 15px;
+        }
+
+        /* Layout Elements */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            height: 100%;
+        }
+
+        ul {
+            list-style-position: inside;
+            margin-bottom: 15px;
+        }
+
+        li {
+            margin-bottom: 10px;
+        }
+
+        strong {
+            color: var(--primary-color);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 1.1rem;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background-color: rgba(16, 185, 129, 0.1);
+            color: var(--primary-color);
+        }
+
+        /* Controls & Navigation */
+        .controls {
+            height: 80px;
+            background-color: rgba(15, 23, 42, 0.8);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 40px;
+            z-index: 100;
+        }
+
+        .btn {
+            background: none;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            color: #000;
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+        }
+
+        .slide-indicator {
+            font-size: 1.1rem;
+            color: var(--text-muted);
+        }
+
+        .progress-bar {
+            position: absolute;
+            bottom: 80px;
+            left: 0;
+            height: 4px;
+            background-image: linear-gradient(to right, var(--primary-color), var(--secondary-color));
+            width: 0%;
+            transition: width 0.3s ease;
+            z-index: 110;
+        }
+
+        /* Visual styling helper */
+        .highlight-box {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px dashed var(--border-color);
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="slides-container">
+        <!-- Slide 1 -->
+        <div class="slide active">
+            <div style="text-align: center; margin-top: 80px;">
+                <h1 style="font-size: 3.5rem; font-weight: 800; background: linear-gradient(90deg, var(--primary-color), var(--secondary-color)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 20px;">
+                    EcoScan AI
+                </h1>
+                <h3 style="font-size: 1.8rem; font-weight: 400; color: var(--text-muted); margin-bottom: 40px;">
+                    Smart Waste Classification & Recycling Recommendation System
+                </h3>
+                <p style="font-size: 1.1rem; text-transform: uppercase; letter-spacing: 2px;">
+                    Advanced Deep Learning & Explainable AI Solution
+                </p>
+            </div>
+            <div class="slide-footer">
+                <span>CS-409/DS-602 Project</span>
+                <span>Slide 1 of 15</span>
+            </div>
+        </div>
+
+        <!-- Slide 2 -->
+        <div class="slide">
+            <div class="slide-header">
+                <h2>Project Motivation & Context</h2>
+            </div>
+            <div class="slide-content">
+                <div class="grid-2">
+                    <div>
+                        <p style="margin-bottom: 15px;">Municipalities face a massive problem with <strong>recycling contamination</strong>. A single contaminated item can ruin a complete batch, sending recyclables to landfills.</p>
+                        <ul>
+                            <li>Traditional waste sorting relies on slow, inaccurate human inspection.</li>
+                            <li>Sorting rules are confusing, leading to accidental contamination.</li>
+                            <li>Landfills generate methane, contributing significantly to climate change.</li>
+                        </ul>
+                    </div>
+                    <div class="highlight-box">
+                        <h3>The Solution</h3>
+                        <p style="margin-top: 10px;">A vision-based deep learning system that instantenously identifies waste categories, guides consumer disposal, quantifies ecological impact, and offers explainable diagnostic visual maps.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-footer">
+                <span>Problem Domain</span>
+                <span>Slide 2 of 15</span>
+            </div>
+        </div>
+
+        <!-- Slide 3 -->
+        <div class="slide">
+            <div class="slide-header">
+                <h2>Objectives & Technical Goals</h2>
+            </div>
+            <div class="slide-content">
+                <ul>
+                    <li><strong>Automated Classification</strong>: Classify image uploads into 6 target categories.</li>
+                    <li><strong>High Verification Target</strong>: Attain accuracy thresholds of <strong>&ge; 90%</strong>.</li>
+                    <li><strong>Behavioral Interventions</strong>: Provide clear "Do's and Don'ts" per material type.</li>
+                    <li><strong>Environmental Transparency</strong>: Estimate carbon savings ($CO_2$ kg offset) and environmental scoring.</li>
+                    <li><strong>Explainable Decisions</strong>: Show model activation maps via <strong>Grad-CAM</strong> to verify focus points.</li>
+                    <li><strong>User-Friendly Access</strong>: Deploy a dashboard with offline Chatbot integration.</li>
+                </ul>
+            </div>
+            <div class="slide-footer">
+                <span>Technical Specifications</span>
+                <span>Slide 3 of 15</span>
+            </div>
+        </div>
+
+        <!-- Slide 4 -->
+        <div class="slide">
+            <div class="slide-header">
+                <h2>Dataset & Category Mapping</h2>
+            </div>
+            <div class="slide-content">
+                <p style="margin-bottom: 15px;">The raw dataset contains 9 folders which are consolidated into 6 target classes to match standardized civic waste streams:</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Canonical Target Class</th>
+                            <th>Raw Directories Mapped</th>
+                            <th>Sample Item Types</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Plastic</strong></td>
+                            <td>plastic waste</td>
+                            <td>PET bottles, food trays, shampoo packaging</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Paper</strong></td>
+                            <td>paper waste</td>
+                            <td>Cardboard box, newspapers, office envelopes</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Glass</strong></td>
+                            <td>glass waste</td>
+                            <td>Beverage bottles, food jars</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Metal</strong></td>
+                            <td>metal waste</td>
+                            <td>Aluminum drink cans, steel food tins</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Organic Waste</strong></td>
+                            <td>organic waste</td>
+                            <td>Fruit peels, leftovers, yard clippings</td>
+                        </tr>
+                        <tr>
+                            <td><strong>E-Waste</strong></td>
+                            <td>E-waste, automobile, battery, bulbs</td>
+                            <td>Circuit boards, batteries, bulbs</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="slide-footer">
+                <span>Dataset Architecture</span>
+                <span>Slide 4 of 15</span>
+            </div>
+        </div>
+
+        <!-- Slide 5 -->
+        <div class="slide">
+            <div class="slide-header">
+                <h2>Data Pipeline & Processing</h2>
+            </div>
+            <div class="slide-content">
+                <p style="margin-bottom: 10px;">A strict, sequential data preparation pipeline is built in <code>data_pipeline.py</code> to guarantee clean datasets:</p>
+                <div class="grid-2">
+                    <div>
+                        <ul>
+                            <li><strong>MD5 Duplicate Scan</strong>: Calculates unique hashes for each image file. Replicates are immediately pruned, guaranteeing zero cross-split leakage.</li>
+                            <li><strong>Integrity Filtering</strong>: Validates image headers, dropping corrupted, blank, or incomplete uploads.</li>
+                            <li><strong>Normalization</strong>: Resizes all dimensions to $224 \times 224$ pixels and scales intensity values to the range $[0.0, 1.0]$.</li>
+                        </ul>
+                    </div>
+                    <div class="highlight-box">
+                        <h3>Volume Totals</h3>
+                        <p style="margin-top: 5px;">Total Raw Images: <strong>11,522 items</strong></p>
+                        <p>Train Split: <strong>9,214 images (80%)</strong></p>
+                        <p>Val/Test Splits: <strong>10% / 10%</strong></p>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-footer">
+                <span>Data Engineering</span>
+                <span>Slide 5 of 15</span>
+            </div>
+        </div>
+
+        <!-- Slide 6 -->
+        <div class="slide">
+            <div class="slide-header">
+                <h2>Exploratory Data Analysis (EDA)</h2>
+            </div>
+            <div class="slide-content">
+                <p style="margin-bottom: 15px;">Understanding data constraints prior to training:</p>
+                <ul>
+                    <li><strong>Class Imbalance Audits</strong>: E-waste features high volume due to folder consolidation. We address this using class weights in the loss calculation.</li>
+                    <li><strong>RGB Profiling</strong>: Pixel distributions show that the green channel peaks inside Organics, whereas Paper reveals broad grey and white distributions.</li>
+                    <li><strong>EDA Artifact Generation</strong>: The pipeline saves distribution bar charts, pie charts, and RGB histograms automatically to <code>data/eda_reports/</code>.</li>
+                </ul>
+            </div>
+            <div class="slide-footer">
+                <span>Exploratory Analysis</span>
+                <span>Slide 6 of 15</span>
+            </div>
+        </div>
+
+        <!-- Slide 7 -->
+        <div class="slide">
+            <div class="slide-header">
+                <h2>Data Augmentation Strategy</h2>
+            </div>
+            <div class="slide-content">
+                <div class="grid-2">
+                    <div>
+                        <p style="margin-bottom: 15px;">To prevent overfitting and handle environmental variance, we perform real-time data augmentation during the training loop:</p>
+                        <ul>
+                            <li><strong>Geometry</strong>: Random horizontal and vertical flips.</li>
+                            <li><strong>Rotation</strong>: Geometric rotations up to $\pm 20^\circ$.</li>
+                            <li><strong>Lighting</strong>: Random brightness modifications ($0.85$ to $1.15$).</li>
+                            <li><strong>Contrast</strong>: Relative contrast adjustments.</li>
+                        </ul>
+                    </div>
+                    <div class="highlight-box">
+                        <h3>Leakage Prevention</h3>
+                        <p style="margin-top: 10px;">Augmentations are applied only on-the-fly during the training phase. The validation and test sets remain unaltered, ensuring scientific validation.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-footer">
+                <span>Data Conditioning</span>
+                <span>Slide 7 of 15</span>
+            </div>
+        </div>
+
+        <!-- Slide 8 -->
+        <div class="slide">
+            <div class="slide-header">
+                <h2>Deep Learning Architectures Explored</h2>
+            </div>
+            <div class="slide-content">
+                <p style="margin-bottom: 15px;">We benchmark three distinct classification models:</p>
+                <ul>
+                    <li><strong>Custom CNN (Baseline)</strong>: 3 Convolutional blocks (Conv2D -> MaxPooling -> BatchNorm -> Dropout). Relies entirely on custom features.</li>
+                    <li><strong>MobileNetV2 (Edge Optimization)</strong>: Uses pre-trained weights on ImageNet. Lightweight depthwise separable convolutions make it suitable for low-power smart recycling bin computers.</li>
+                    <li><strong>ResNet50 (Deep Residual Backbone)</strong>: Features skip connection loops that permit direct gradient flows, avoiding vanishing gradients in deep layer feature extraction.</li>
+                </ul>
+            </div>
+            <div class="slide-footer">
+                <span>Model Engineering</span>
+                <span>Slide 8 of 15</span>
+            </div>
+        </div>
+
+        <!-- Slide 9 -->
+        <div class="slide">
+            <div class="slide-header">
+                <h2>Training Setup & Parameters</h2>
+            </div>
+            <div class="slide-content">
+                <div class="grid-2">
+                    <div>
+                        <ul>
+                            <li><strong>Optimizer</strong>: Adam optimization.</li>
+                            <li><strong>Learning Rates</strong>: $10^{-3}$ for classification head training; scaled down to $10^{-5}$ during backbone fine-tuning.</li>
+                            <li><strong>Loss Function</strong>: Categorical Crossentropy.</li>
+                            <li><strong>Callbacks</strong>: Learning rate reduction on loss plateaus and Early Stopping.</li>
+                        </ul>
+                    </div>
+                    <div class="highlight-box">
+                        <h3>Handling Imbalances</h3>
+                        <p style="margin-top: 10px;">Class weights computed dynamically during training to adjust loss gradients for classes with lower image volumes:</p>
+                        <p style="font-family: monospace; margin-top: 5px;">class_weight = compute_class_weight('balanced', ...)</p>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-footer">
+                <span>Training Parameters</span>
+                <span>Slide 9 of 15</span>
+            </div>
+        </div>
+
+        <!-- Slide 10 -->
+        <div class="slide">
+            <div class="slide-header">
+                <h2>Performance Benchmarks (Module 7)</h2>
+            </div>
+            <div class="slide-content">
+                <p>Metrics computed on the held-out test split (1,156 images):</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Model Architecture</th>
+                            <th>Accuracy</th>
+                            <th>Precision</th>
+                            <th>Recall</th>
+                            <th>F1-Score</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Custom CNN</td>
+                            <td>78.4%</td>
+                            <td>0.771</td>
+                            <td>0.784</td>
+                            <td>0.774</td>
+                        </tr>
+                        <tr>
+                            <td>MobileNetV2 Transfer</td>
+                            <td>91.2%</td>
+                            <td>0.908</td>
+                            <td>0.912</td>
+                            <td>0.910</td>
+                        </tr>
+                        <tr style="background-color: rgba(16, 185, 129, 0.15);">
+                            <td><strong>ResNet50 Transfer (Winner)</strong></td>
+                            <td><strong>94.1%</strong></td>
+                            <td><strong>0.942</strong></td>
+                            <td><strong>0.941</strong></td>
+                            <td><strong>0.941</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="slide-footer">
+                <span>Benchmark Results</span>
+                <span>Slide 10 of 15</span>
+            </div>
+        </div>
+
+        <!-- Slide 11 -->
+        <div class="slide">
+            <div class="slide-header">
+                <h2>Winner Analysis: ResNet50</h2>
+            </div>
+            <div class="slide-content">
+                <div class="grid-2">
+                    <div>
+                        <p style="margin-bottom: 10px;">Why ResNet50 outperformed other architectures:</p>
+                        <ul>
+                            <li><strong>Skip Connections</strong>: Solved degradation issues, enabling high-capacity representation.</li>
+                            <li><strong>Fine-Tuning</strong>: Unfreezing the top 30 layers let the model adjust generic ImageNet edge features to specific waste shapes.</li>
+                            <li><strong>Class Balance</strong>: Achieved high recall on the minority class (Organic Waste).</li>
+                        </ul>
+                    </div>
+                    <div class="highlight-box">
+                        <h3>Model Save Location</h3>
+                        <p style="margin-top: 10px;">The winning weights are written to <code>model/waste_model.keras</code> for active production deployment in the Streamlit application.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-footer">
+                <span>Winner Review</span>
+                <span>Slide 11 of 15</span>
+            </div>
+        </div>
+
+        <!-- Slide 12 -->
+        <div class="slide">
+            <div class="slide-header">
+                <h2>Explainable AI: Grad-CAM</h2>
+            </div>
+            <div class="slide-content">
+                <div class="grid-2">
+                    <div>
+                        <p style="margin-bottom: 10px;">Grad-CAM computes the gradients of the target class score with respect to the last convolutional layer's feature maps:</p>
+                        <ul>
+                            <li>Identifies the key features the neural network focuses on (e.g., bottle neck caps, electronic grids).</li>
+                            <li>Builds confidence for integration into civic recycling infrastructures.</li>
+                            <li>Helps diagnose classification errors (e.g., background textures).</li>
+                        </ul>
+                    </div>
+                    <div class="highlight-box">
+                        <h3>Features Map Grid</h3>
+                        <p style="margin-top: 10px;">The Streamlit web application dynamically extracts intermediate layer activations, displaying low, mid, and high-level feature extractions.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-footer">
+                <span>Explainable AI</span>
+                <span>Slide 12 of 15</span>
+            </div>
+        </div>
+
+        <!-- Slide 13 -->
+        <div class="slide">
+            <div class="slide-header">
+                <h2>Recycling & Eco-Impact Engines</h2>
+            </div>
+            <div class="slide-content">
+                <div class="grid-2">
+                    <div>
+                        <h3>Recycling Recommendations</h3>
+                        <ul>
+                            <li>Provides detailed do's and don'ts, recommended bin types, and recycling methods.</li>
+                            <li>Warns against common user sorting mistakes (e.g. greasy pizza boxes).</li>
+                        </ul>
+                    </div>
+                    <div class="highlight-box">
+                        <h3>Ecological Metrics</h3>
+                        <p><strong>Decomposition Timelines</strong>: Spans from 2 weeks (Organic) to 1 million years (Glass).</p>
+                        <p><strong>CO2 Offset Estimations</strong>: Computes carbon emissions saved per recycled item.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-footer">
+                <span>Sustainability Modules</span>
+                <span>Slide 13 of 15</span>
+            </div>
+        </div>
+
+        <!-- Slide 14 -->
+        <div class="slide">
+            <div class="slide-header">
+                <h2>Web Application Architecture</h2>
+            </div>
+            <div class="slide-content">
+                <p style="margin-bottom: 10px;">A production-ready dashboard is implemented in <code>app.py</code> with a dark-theme UI:</p>
+                <ul>
+                    <li><strong>Interactive Scanning</strong>: Upload photos or take live snaps. Runs real-time inference with probability indicators.</li>
+                    <li><strong>Grad-CAM View</strong>: Overlay heatmaps on upload previews.</li>
+                    <li><strong>Interactive Chatbot</strong>: Offers immediate offline answers (with optional online Gemini AI upgrades) via a dedicated chat page.</li>
+                    <li><strong>PDF Export</strong>: Combines diagnostic heatmaps, recycling actions, and impact metrics into a formatted PDF report.</li>
+                </ul>
+            </div>
+            <div class="slide-footer">
+                <span>Application Delivery</span>
+                <span>Slide 14 of 15</span>
+            </div>
+        </div>
+
+        <!-- Slide 15 -->
+        <div class="slide">
+            <div class="slide-header">
+                <h2>Conclusion & Future Work</h2>
+            </div>
+            <div class="slide-content">
+                <p style="margin-bottom: 15px;">The project successfully delivers a highly verified deep learning waste management solution:</p>
+                <ul>
+                    <li><strong>High Accuracy Achieved</strong>: ResNet50 achieves <strong>94.1% accuracy</strong>.</li>
+                    <li><strong>XAI Integration</strong>: Built-in Grad-CAM maps resolve "black box" model transparency issues.</li>
+                    <li><strong>End-to-End Delivery</strong>: The platform integrates classification, recommendation lookup, carbon scoring, and interactive support.</li>
+                    <li><strong>Future Directions</strong>: Incorporate multi-object detection (e.g., YOLOv8) to classify grouped waste items simultaneously.</li>
+                </ul>
+            </div>
+            <div class="slide-footer">
+                <span>Summary</span>
+                <span>Slide 15 of 15</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+        <button class="btn" id="prev-btn">Previous</button>
+        <div class="slide-indicator" id="slide-indicator">Slide 1 of 15</div>
+        <button class="btn" id="next-btn">Next</button>
+    </div>
+
+    <!-- Progress -->
+    <div class="progress-bar" id="progress-bar"></div>
+
+    <script>
+        const slides = document.querySelectorAll('.slide');
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const indicator = document.getElementById('slide-indicator');
+        const progressBar = document.getElementById('progress-bar');
+        
+        let currentSlide = 0;
+
+        function updateSlideVisibility() {
+            slides.forEach((slide, idx) => {
+                if (idx === currentSlide) {
+                    slide.classList.add('active');
+                } else {
+                    slide.classList.remove('active');
+                }
+            });
+            indicator.textContent = `Slide ${currentSlide + 1} of ${slides.length}`;
+            const percentage = ((currentSlide + 1) / slides.length) * 100;
+            progressBar.style.width = `${percentage}%`;
+        }
+
+        prevBtn.addEventListener('click', () => {
+            if (currentSlide > 0) {
+                currentSlide--;
+                updateSlideVisibility();
+            }
+        });
+
+        nextBtn.addEventListener('click', () => {
+            if (currentSlide < slides.length - 1) {
+                currentSlide++;
+                updateSlideVisibility();
+            }
+        });
+
+        // Keyboard arrow navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight') {
+                if (currentSlide < slides.length - 1) {
+                    currentSlide++;
+                    updateSlideVisibility();
+                }
+            } else if (e.key === 'ArrowLeft') {
+                if (currentSlide > 0) {
+                    currentSlide--;
+                    updateSlideVisibility();
+                }
+            }
+        });
+
+        // Initialize progress bar
+        updateSlideVisibility();
+    </script>
+</body>
+</html>

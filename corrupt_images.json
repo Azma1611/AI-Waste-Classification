@@ -1,0 +1,57 @@
+{
+  "corrupt": [
+    [
+      "dataset\\wastes\\test\\glass waste\\glass waste (254).jpg",
+      "broken data stream when reading image file"
+    ],
+    [
+      "dataset\\wastes\\test\\glass waste\\glass waste (52).jpg",
+      "broken data stream when reading image file"
+    ],
+    [
+      "dataset\\wastes\\test\\glass waste\\glass waste (53).jpg",
+      "broken data stream when reading image file"
+    ],
+    [
+      "dataset\\wastes\\train\\glass waste\\glass waste  (942).jpg",
+      "broken data stream when reading image file"
+    ],
+    [
+      "dataset\\wastes\\train\\glass waste\\glass waste  (943).jpg",
+      "broken data stream when reading image file"
+    ],
+    [
+      "dataset\\wastes\\train\\glass waste\\glass waste  (952).jpg",
+      "broken data stream when reading image file"
+    ],
+    [
+      "dataset\\wastes\\train\\glass waste\\glass waste  (953).jpg",
+      "broken data stream when reading image file"
+    ],
+    [
+      "dataset\\wastes\\train\\glass waste\\glass waste  (956).jpg",
+      "broken data stream when reading image file"
+    ],
+    [
+      "dataset\\wastes\\train\\glass waste\\glass waste  (961).jpg",
+      "broken data stream when reading image file"
+    ],
+    [
+      "dataset\\wastes\\train\\glass waste\\glass waste  (968).jpg",
+      "broken data stream when reading image file"
+    ],
+    [
+      "dataset\\wastes\\train\\glass waste\\glass waste  (972).jpg",
+      "broken data stream when reading image file"
+    ],
+    [
+      "dataset\\wastes\\train\\glass waste\\glass waste  (981).jpg",
+      "broken data stream when reading image file"
+    ],
+    [
+      "dataset\\wastes\\train\\glass waste\\glass waste  (983).jpg",
+      "broken data stream when reading image file"
+    ]
+  ],
+  "large": []
+}

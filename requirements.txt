@@ -1,10 +1,30 @@
-streamlit>=1.35.0
+# ============================================================
+# AI-Powered Smart Waste Classification & Recycling System
+# Complete Dependency List
+# ============================================================
+
+# ── Deep Learning & ML ───────────────────────────────────────
+tensorflow>=2.15.0
+keras>=2.15.0
+scikit-learn>=1.4.0
+
+# ── Data Processing ──────────────────────────────────────────
 numpy>=1.26.0,<2.0
+pandas>=2.1.0
+
+# ── Image Processing ─────────────────────────────────────────
+opencv-python-headless>=4.9.0
 Pillow>=10.4.0
+
+# ── Visualization ────────────────────────────────────────────
 matplotlib>=3.8.0
 seaborn>=0.13.0
-opencv-python-headless>=4.9.0
+
+# ── Web Application ──────────────────────────────────────────
+streamlit>=1.35.0
+
+# ── AI Chatbot (Optional — works without API key) ────────────
 google-generativeai>=0.5.0
-scikit-learn>=1.4.0
-pandas>=2.1.0
-tensorflow-cpu~=2.15.0
+
+# ── Report Generation ────────────────────────────────────────
+fpdf2>=2.7.0

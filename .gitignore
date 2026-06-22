@@ -4,6 +4,8 @@ __pycache__/
 .gradio/
 data/
 model/results/
+model/temp_*.keras
+dataset/
 *.log
 .env
 kaggle.json

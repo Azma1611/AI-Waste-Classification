@@ -20,6 +20,7 @@ import hashlib
 import logging
 import random
 import math
+import shutil
 
 import numpy as np
 import pandas as pd
@@ -178,43 +179,61 @@ def augment_image(img: Image.Image) -> Image.Image:
 
 def generate_augmented_images(class_dirs: dict[str, str], copies_per_image: int = AUGMENT_PER_IMG) -> int:
     """
-    For every valid source image in each class directory, produce `copies_per_image`
-    augmented variants and save them with an `_aug<n>` suffix.
+    Select a sample image from each class, generate several augmented copies,
+    and save a side-by-side 'Before vs. After' visualization grid in the EDA folder.
+    This demonstrates the augmentation pipeline without polluting the training dataset.
 
     Returns
     -------
-    total_generated : int — total augmented images written to disk
+    total_generated : int — number of augmented samples generated in the visualization
     """
-    total_generated = 0
-
+    logger.info("Generating side-by-side data augmentation examples for report visualization...")
+    samples = []
+    
     for cls, directory in class_dirs.items():
-        source_files = [
+        valid_files = [
             f for f in os.listdir(directory)
             if os.path.splitext(f)[1].lower() in VALID_EXTS
-            and "_aug" not in f                # skip already-augmented files
         ]
+        if valid_files:
+            filename = random.choice(valid_files)
+            samples.append((cls, os.path.join(directory, filename)))
 
-        for filename in source_files:
-            filepath = os.path.join(directory, filename)
-            stem, ext = os.path.splitext(filename)
+    if not samples:
+        logger.warning("No images found to generate augmentation samples.")
+        return 0
 
-            try:
-                source_img = Image.open(filepath).convert("RGB").resize(TARGET_SIZE, Image.LANCZOS)
-            except Exception as exc:
-                logger.error("Cannot open image '%s': %s", filepath, exc)
-                continue
+    n_rows = len(samples)
+    fig, axes = plt.subplots(n_rows, 4, figsize=(12, 3 * n_rows))
+    if n_rows == 1:
+        axes = np.expand_dims(axes, axis=0)
 
-            for n in range(1, copies_per_image + 1):
-                augmented   = augment_image(source_img)
-                out_name    = f"{stem}_aug{n}{ext}"
-                out_path    = os.path.join(directory, out_name)
-                augmented.save(out_path)
-                total_generated += 1
+    for i, (cls, filepath) in enumerate(samples):
+        try:
+            original = Image.open(filepath).convert("RGB").resize(TARGET_SIZE, Image.LANCZOS)
+            
+            # Original image in first column
+            axes[i, 0].imshow(original)
+            axes[i, 0].set_title(f"{cls} (Original)", fontsize=9, fontweight="bold")
+            axes[i, 0].axis("off")
+            
+            # 3 augmented versions in columns 1, 2, 3
+            for col in range(1, 4):
+                augmented = augment_image(original)
+                axes[i, col].imshow(augmented)
+                axes[i, col].set_title(f"Augmented Var {col}", fontsize=9)
+                axes[i, col].axis("off")
+        except Exception as exc:
+            logger.error("Error creating augmentation visual for %s: %s", filepath, exc)
 
-        logger.info("[%s] Augmentation complete — %d new images generated.", cls, len(source_files) * copies_per_image)
-
-    logger.info("Total augmented images saved: %d", total_generated)
-    return total_generated
+    plt.suptitle("Sequential Image Data Augmentation Samples", fontsize=14, fontweight="bold", y=0.99)
+    plt.tight_layout()
+    
+    out_path = os.path.join(EDA_OUTPUT_DIR, "fig4_augmentation_samples.png")
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    logger.info("Saved data augmentation samples visualization grid → %s", out_path)
+    return len(samples) * 3
 
 
 # ─── 5. EDA Reporting & Visualisations ────────────────────────────────────────
@@ -374,10 +393,73 @@ def generate_eda_reports(class_dirs: dict[str, str]) -> None:
     logger.info("EDA reporting complete. All 3 figures saved to '%s'.", EDA_OUTPUT_DIR)
 
 
+RAW_DATA_MAP = {
+    "plastic waste": "Plastic",
+    "paper waste": "Paper",
+    "glass waste": "Glass",
+    "metal waste": "Metal",
+    "organic waste": "Organic Waste",
+    "E-waste": "E-Waste",
+    "automobile wastes": "E-Waste",
+    "battery waste": "E-Waste",
+    "light bulbs": "E-Waste",
+}
+
+def import_and_map_dataset(src_root: str, dest_root: str) -> None:
+    """
+    Import images from raw dataset/wastes/{train,test} subfolders,
+    map them to the 6 target classes, and copy them to dest_root.
+    """
+    logger.info("Importing and mapping dataset from '%s' to '%s'...", src_root, dest_root)
+    if not os.path.exists(src_root):
+        logger.error("Source dataset directory '%s' not found!", src_root)
+        return
+
+    count_copied = 0
+    for split in ["train", "test"]:
+        split_dir = os.path.join(src_root, split)
+        if not os.path.exists(split_dir):
+            continue
+        
+        for folder_name in os.listdir(split_dir):
+            src_folder = os.path.join(split_dir, folder_name)
+            if not os.path.isdir(src_folder):
+                continue
+            
+            target_class = RAW_DATA_MAP.get(folder_name)
+            if not target_class:
+                for k, v in RAW_DATA_MAP.items():
+                    if k.lower() == folder_name.lower():
+                        target_class = v
+                        break
+            
+            if not target_class:
+                logger.warning("No mapping found for folder '%s'. Skipping.", folder_name)
+                continue
+                
+            dest_folder = os.path.join(dest_root, target_class)
+            os.makedirs(dest_folder, exist_ok=True)
+            
+            for filename in os.listdir(src_folder):
+                if os.path.splitext(filename)[1].lower() not in VALID_EXTS:
+                    continue
+                
+                src_path = os.path.join(src_folder, filename)
+                dest_filename = f"{folder_name.replace(' ', '_')}_{filename}"
+                dest_path = os.path.join(dest_folder, dest_filename)
+                
+                if not os.path.exists(dest_path):
+                    shutil.copy2(src_path, dest_path)
+                    count_copied += 1
+                    
+    logger.info("Dataset import complete. Copied %d images.", count_copied)
+
+
 # ─── Pipeline Orchestrator ────────────────────────────────────────────────────
 def run_pipeline() -> None:
     """
     Orchestrate the full data pipeline in a strict, sequential order:
+      Step 0 → Import and map raw dataset
       Step 1 → Create directory structure
       Step 2 → Remove duplicate images
       Step 3 → Generate augmented images
@@ -390,6 +472,10 @@ def run_pipeline() -> None:
     # Step 1: Directory structure
     logger.info("STEP 1: Creating directory structure...")
     class_dirs = create_directory_structure(DATA_ROOT, WASTE_CLASSES)
+
+    # Step 1b: Import and map dataset
+    logger.info("STEP 1.5: Importing and mapping raw dataset...")
+    import_and_map_dataset(os.path.join("dataset", "wastes"), DATA_ROOT)
 
     # Step 2: Duplicate elimination
     logger.info("STEP 2: Scanning for and removing duplicate images...")
