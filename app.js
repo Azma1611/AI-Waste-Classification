@@ -165,17 +165,44 @@ class ImageHandler {
 
   processFile(file) {
     const reader = new FileReader();
-    reader.onload = (e) => {
-      this.showPreview(e.target.result);
-      this.app.classifyImage(this.previewImage);
+    reader.onload = async (e) => {
+      try {
+        await this.showPreview(e.target.result);
+        this.app.classifyImage(this.previewImage);
+      } catch (err) {
+        this.stopScanning();
+        this.app.showToast('⚠️ Could not load that image. Please try another file.', 'error');
+      }
     };
     reader.readAsDataURL(file);
   }
 
   showPreview(src) {
-    this.previewImage.src = src;
     this.previewContainer.classList.add('active');
     this.startScanning();
+
+    return new Promise((resolve, reject) => {
+      const cleanup = () => {
+        this.previewImage.onload = null;
+        this.previewImage.onerror = null;
+      };
+
+      this.previewImage.onload = () => {
+        cleanup();
+        resolve();
+      };
+      this.previewImage.onerror = () => {
+        cleanup();
+        reject(new Error('Preview image failed to load'));
+      };
+
+      this.previewImage.src = src;
+
+      if (this.previewImage.complete && this.previewImage.naturalWidth > 0) {
+        cleanup();
+        resolve();
+      }
+    });
   }
 
   startScanning() {
@@ -216,7 +243,7 @@ class CameraHandler {
     }
   }
 
-  capture() {
+  async capture() {
     const ctx = this.canvas.getContext('2d');
     this.canvas.width = this.video.videoWidth;
     this.canvas.height = this.video.videoHeight;
@@ -224,11 +251,14 @@ class CameraHandler {
 
     const dataUrl = this.canvas.toDataURL('image/jpeg', 0.9);
     this.close();
-    this.app.imageHandler.showPreview(dataUrl);
-    // Wait for image to load before classifying
-    this.app.imageHandler.previewImage.onload = () => {
+
+    try {
+      await this.app.imageHandler.showPreview(dataUrl);
       this.app.classifyImage(this.app.imageHandler.previewImage);
-    };
+    } catch (err) {
+      this.app.imageHandler.stopScanning();
+      this.app.showToast('⚠️ Could not load the captured image. Please try again.', 'error');
+    }
   }
 
   close() {
