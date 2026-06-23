@@ -276,8 +276,16 @@ with st.sidebar:
                         reply = agent.generate_content(sys_prompt).text
                         st.markdown(reply)
                     except Exception as e:
-                        reply = f"API Error: {e}"
-                        st.error(reply)
+                        err_str = str(e)
+                        if "API key not valid" in err_str or "API_KEY_INVALID" in err_str:
+                            reply = (
+                                "🔑 **Invalid Gemini API Key.** The key provided in your Streamlit Cloud secrets or "
+                                "environment variables was rejected by Google. Please check your credentials."
+                            )
+                            st.warning(reply)
+                        else:
+                            reply = f"API Error: {e}"
+                            st.error(reply)
 
         st.session_state.chat_history.append({"role": "assistant", "text": reply})
 
@@ -502,7 +510,7 @@ elif app_mode == "📸 Live Classification Workspace":
                     st.warning("No trained model found — showing simulated prediction.")
 
                 # ─── Automatic Gemini AI Verification Layer ───
-                if GEMINI_API_KEY != "YOUR_GEMINI_API_KEY_HERE" and GEMINI_API_KEY:
+                if GEMINI_API_KEY != "YOUR_GEMINI_API_KEY_HERE" and GEMINI_API_KEY and st.session_state.get("gemini_active", True):
                     try:
                         with st.spinner("Invoking Gemini AI Verification Layer..."):
                             gemini_model = genai.GenerativeModel("gemini-1.5-flash")
@@ -528,7 +536,10 @@ elif app_mode == "📸 Live Classification Workspace":
                                         predictions = p_new
                                     break
                     except Exception as e:
-                        pass
+                        err_str = str(e)
+                        if "API key not valid" in err_str or "API_KEY_INVALID" in err_str:
+                            st.session_state.gemini_active = False
+                            st.toast("⚠️ Invalid Gemini API Key. Verification layer disabled.", icon="🔑")
 
             # Store in session state to persist across widget reruns
             st.session_state.predictions = predictions

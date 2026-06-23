@@ -358,6 +358,14 @@ class WasteManagementChatbot:
             response = self.gemini_model.generate_content(system_prompt)
             return response.text
         except Exception as e:
+            err_str = str(e)
+            if "API key not valid" in err_str or "API_KEY_INVALID" in err_str:
+                self.gemini_available = False  # Disable future queries to avoid timeouts
+                return (
+                    "🔑 **Invalid Gemini API Key.** The key provided in the "
+                    "`GEMINI_API_KEY` environment variable or Streamlit secrets was "
+                    "rejected by Google. Please verify that your API key is correct and valid."
+                )
             return f"⚠️ AI service temporarily unavailable. Error: {e}\n\n" + random.choice(FALLBACK_RESPONSES)
 
     @property

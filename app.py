@@ -405,7 +405,7 @@ if app_view == "📸 Prediction Workspace":
             heatmap = np.random.rand(7, 7)
 
         # ─── Automatic Gemini AI Verification Layer ───
-        if GEMINI_API_KEY != "YOUR_GEMINI_API_KEY_HERE" and GEMINI_API_KEY:
+        if GEMINI_API_KEY != "YOUR_GEMINI_API_KEY_HERE" and GEMINI_API_KEY and st.session_state.get("gemini_active", True):
             try:
                 with st.spinner("Invoking Gemini AI Verification Layer..."):
                     gemini_model = genai.GenerativeModel("gemini-1.5-flash")
@@ -431,7 +431,10 @@ if app_view == "📸 Prediction Workspace":
                                 predictions = p_new
                             break
             except Exception as e:
-                pass
+                err_str = str(e)
+                if "API key not valid" in err_str or "API_KEY_INVALID" in err_str:
+                    st.session_state.gemini_active = False
+                    st.toast("⚠️ Invalid Gemini API Key. Verification layer disabled.", icon="🔑")
 
         # Store in session state to persist across reruns
         st.session_state.predictions = predictions
