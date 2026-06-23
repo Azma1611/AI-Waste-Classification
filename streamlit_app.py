@@ -38,6 +38,11 @@ st.set_page_config(
 if "app_mode" not in st.session_state:
     st.session_state["app_mode"] = "📊 System Setup & EDA"
 
+# Demo mode guard to prevent accidental writes during UI testing
+# Default to False so disk writes are disabled unless explicitly enabled in the sidebar
+if "allow_disk_write" not in st.session_state:
+    st.session_state["allow_disk_write"] = False
+
 # Dark theme custom CSS
 st.markdown("""
 <style>
@@ -463,6 +468,9 @@ with st.sidebar:
         key="app_mode",
     )
 
+    # Allow user to opt-in to disk writes (disabled by default)
+    st.checkbox("Allow saving feedback to disk (for training)", value=st.session_state.get("allow_disk_write", False), key="allow_disk_write")
+
     st.markdown("---")
     if app_mode == "📸 Live Classification Workspace":
         st.markdown("### 🔬 XAI Configuration")
@@ -779,11 +787,14 @@ elif app_mode == "📸 Live Classification Workspace":
                 # Active Learning: Save misclassified sample to a feedback folder for future training loops
                 try:
                     feedback_dir = os.path.join("dataset_feedback", corrected_class)
-                    os.makedirs(feedback_dir, exist_ok=True)
                     import time
                     img_filename = f"feedback_{int(time.time())}.jpg"
-                    pil_img.save(os.path.join(feedback_dir, img_filename))
-                    st.toast(f"💾 Saved to feedback folder under '{corrected_class}'! This sample will retrain the AI and fix this blindspot automatically.", icon="♻️")
+                    if not st.session_state.get("allow_disk_write", False):
+                        st.info("Demo mode: not saving feedback to disk. Enable 'Allow saving feedback to disk' in the sidebar to save samples.")
+                    else:
+                        os.makedirs(feedback_dir, exist_ok=True)
+                        pil_img.save(os.path.join(feedback_dir, img_filename))
+                        st.toast(f"💾 Saved to feedback folder under '{corrected_class}'! This sample will retrain the AI and fix this blindspot automatically.", icon="♻️")
                 except Exception as e:
                     pass
 
