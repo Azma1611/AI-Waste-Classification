@@ -693,16 +693,34 @@ def visualize_intermediate_features(
         ax.axis("off")
         return fig
 
+    # Check for nested sub-models (e.g. MobileNetV2 or ResNet50 base models)
+    base_model = None
+    for layer in model.layers:
+        if hasattr(layer, "layers") and isinstance(layer, tf.keras.Model):
+            base_model = layer
+            break
+
     # Build sub-models for each target layer
     outputs = []
     valid_names = []
+    use_base = (base_model is not None)
+
     for name in layer_names:
         try:
-            layer = _get_nested_layer(model, name)
+            if use_base:
+                layer = base_model.get_layer(name)
+            else:
+                layer = model.get_layer(name)
             outputs.append(layer.output)
             valid_names.append(name)
         except ValueError:
-            continue
+            # Fallback to general lookup
+            try:
+                layer = _get_nested_layer(model, name)
+                outputs.append(layer.output)
+                valid_names.append(name)
+            except ValueError:
+                continue
 
     if not outputs:
         fig, ax = plt.subplots(1, 1, figsize=(6, 4))
@@ -711,8 +729,19 @@ def visualize_intermediate_features(
         ax.axis("off")
         return fig
 
-    feature_model = tf.keras.Model(inputs=model.input, outputs=outputs)
-    activations = feature_model.predict(img_array, verbose=0)
+    if base_model is not None and use_base:
+        feature_model = tf.keras.Model(inputs=base_model.input, outputs=outputs)
+        # Preprocess raw image [0, 1] to match the base model range
+        x_prep = tf.convert_to_tensor(img_array, dtype=tf.float32) * 255.0
+        model_name_lower = base_model.name.lower()
+        if "resnet50" in model_name_lower:
+            x_prep = tf.keras.applications.resnet50.preprocess_input(x_prep)
+        elif "mobilenet" in model_name_lower:
+            x_prep = tf.keras.applications.mobilenet_v2.preprocess_input(x_prep)
+        activations = feature_model.predict(x_prep, verbose=0)
+    else:
+        feature_model = tf.keras.Model(inputs=model.input, outputs=outputs)
+        activations = feature_model.predict(img_array, verbose=0)
 
     if not isinstance(activations, list):
         activations = [activations]
