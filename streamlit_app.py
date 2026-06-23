@@ -242,46 +242,7 @@ with st.sidebar:
         xai_method = "Score-CAM (Gradient-Free)"
         k_channels = 64
 
-    st.markdown("---")
-    st.subheader("🤖 Eco-Bot Assistant")
-    st.caption("Ask anything about recycling, waste disposal, or assignment objectives.")
 
-    # Initialize chatbot instance
-    if "chatbot" not in st.session_state:
-        st.session_state.chatbot = chatbot.WasteManagementChatbot(gemini_api_key=GEMINI_API_KEY)
-
-    # Sync Gemini active state
-    if not st.session_state.get("gemini_active", True):
-        st.session_state.chatbot.gemini_available = False
-
-    # Display status
-    if st.session_state.chatbot.is_ai_enhanced:
-        st.caption("🟢 Eco-Bot Status: Online (Gemini AI API)")
-    else:
-        st.caption("⚪ Eco-Bot Status: Offline Rule-Based Mode active.")
-
-    if "chat_history" not in st.session_state:
-        st.session_state.chat_history = []
-
-    for msg in st.session_state.chat_history[-6:]:   # show last 6 messages
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["text"])
-
-    user_chat = st.chat_input("Ask about waste management...")
-    if user_chat:
-        st.session_state.chat_history.append({"role": "user", "text": user_chat})
-        with st.chat_message("user"):
-            st.markdown(user_chat)
-
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                reply = st.session_state.chatbot.get_response(user_chat)
-                st.markdown(reply)
-                # Sync back if the chatbot disabled Gemini
-                if not st.session_state.chatbot.is_ai_enhanced:
-                    st.session_state.gemini_active = False
-
-        st.session_state.chat_history.append({"role": "assistant", "text": reply})
 
 
 # ==============================================================================
@@ -674,8 +635,56 @@ elif app_mode == "📸 Live Classification Workspace":
         imp_color = IMPACT_COLORS.get(impact, "#888")
         impact_map   = {"Low": 20, "Medium": 50, "High": 75, "Critical": 100}
         impact_score = impact_map.get(impact, 50)
+        
+        # ── Row 2 (full width): 🤖 Eco-Bot Assistant ──
+        st.markdown("---")
+        st.markdown("## 🤖 Eco-Bot Assistant")
+        st.caption("Ask anything about recycling, waste disposal, or assignment objectives.")
 
-        # ── Row 2 (full width): XAI Explainability Visualizations ──
+        # Initialize chatbot instance
+        if "chatbot" not in st.session_state:
+            st.session_state.chatbot = chatbot.WasteManagementChatbot(gemini_api_key=GEMINI_API_KEY)
+
+        # Sync Gemini active state
+        if not st.session_state.get("gemini_active", True):
+            st.session_state.chatbot.gemini_available = False
+
+        # Display status
+        if st.session_state.chatbot.is_ai_enhanced:
+            st.caption("🟢 Eco-Bot Status: Online (Gemini AI API)")
+        else:
+            st.caption("⚪ Eco-Bot Status: Offline Rule-Based Mode active.")
+
+        if "chat_history" not in st.session_state:
+            st.session_state.chat_history = []
+
+        for msg in st.session_state.chat_history:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["text"])
+
+        user_chat = st.chat_input("Ask about waste management...", key="workspace_chat_input")
+        if user_chat:
+            st.session_state.chat_history.append({"role": "user", "text": user_chat})
+            with st.chat_message("user"):
+                st.markdown(user_chat)
+
+            with st.chat_message("assistant"):
+                with st.spinner("Thinking..."):
+                    reply = st.session_state.chatbot.get_response(user_chat)
+                    st.markdown(reply)
+                    # Sync back if the chatbot disabled Gemini
+                    if not st.session_state.chatbot.is_ai_enhanced:
+                        st.session_state.gemini_active = False
+
+            st.session_state.chat_history.append({"role": "assistant", "text": reply})
+
+        # Clear history button
+        if len(st.session_state.chat_history) > 0:
+            if st.button("🧹 Clear Chat History", key="workspace_clear_chat"):
+                st.session_state.chat_history = []
+                st.rerun()
+
+        # ── Row 3 (full width): XAI Explainability Visualizations ──
         st.markdown("---")
         method_title = "Score-CAM" if xai_method.startswith("Score-CAM") else "Grad-CAM++"
         st.markdown(f"## 🔬 Explainable AI — {method_title} Visualizations")
