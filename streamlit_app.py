@@ -98,6 +98,7 @@ st.markdown("""
         max-height: 350px !important;
         object-fit: contain !important;
         border-radius: 8px;
+    }
     .st-key-ecobot_widget_root {
         position: static !important;
         width: auto !important;
