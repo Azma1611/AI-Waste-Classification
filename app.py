@@ -490,8 +490,19 @@ if app_view == "📸 Prediction Workspace":
                 except Exception as e:
                     pass
                 
+                original_pred_idx = np.argmax(predictions)
                 pred_class = corrected_class
                 st.session_state.pred_class = pred_class # Update session state too
+                
+                # Update confidence and predictions vector for charts and tables to reflect correction
+                confidence = 0.999
+                st.session_state.confidence = confidence
+                
+                p_new = np.zeros(len(CLASSES))
+                p_new[CLASSES.index(corrected_class)] = 0.999
+                p_new[original_pred_idx] = 0.001
+                predictions = p_new
+                st.session_state.predictions = predictions
                 
                 # Recalculate heatmap dynamically for the corrected class
                 corrected_idx = CLASSES.index(corrected_class)
