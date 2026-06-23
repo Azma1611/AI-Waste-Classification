@@ -359,14 +359,26 @@ class WasteManagementChatbot:
             return response.text
         except Exception as e:
             err_str = str(e)
-            if "API key not valid" in err_str or "API_KEY_INVALID" in err_str:
+            err_lower = err_str.lower()
+            is_auth_error = (
+                "api key" in err_lower or
+                "api_key" in err_lower or
+                "invalid" in err_lower or
+                "auth" in err_lower or
+                "credential" in err_lower or
+                "unauthorized" in err_lower
+            )
+            if is_auth_error:
                 self.gemini_available = False  # Disable future queries to avoid timeouts
+                fallback_msg = random.choice(FALLBACK_RESPONSES)
                 return (
                     "🔑 **Invalid Gemini API Key.** The key provided in the "
                     "`GEMINI_API_KEY` environment variable or Streamlit secrets was "
-                    "rejected by Google. Please verify that your API key is correct and valid."
+                    "rejected by Google. Falling back to local offline mode.\n\n"
+                    f"**Eco-Bot (Offline Mode):**\n{fallback_msg}"
                 )
             return f"⚠️ AI service temporarily unavailable. Error: {e}\n\n" + random.choice(FALLBACK_RESPONSES)
+
 
     @property
     def is_ai_enhanced(self) -> bool:

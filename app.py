@@ -432,9 +432,19 @@ if app_view == "📸 Prediction Workspace":
                             break
             except Exception as e:
                 err_str = str(e)
-                if "API key not valid" in err_str or "API_KEY_INVALID" in err_str:
+                err_lower = err_str.lower()
+                is_auth_error = (
+                    "api key" in err_lower or
+                    "api_key" in err_lower or
+                    "invalid" in err_lower or
+                    "auth" in err_lower or
+                    "credential" in err_lower or
+                    "unauthorized" in err_lower
+                )
+                if is_auth_error:
                     st.session_state.gemini_active = False
                     st.toast("⚠️ Invalid Gemini API Key. Verification layer disabled.", icon="🔑")
+
 
         # Store in session state to persist across reruns
         st.session_state.predictions = predictions
@@ -875,6 +885,10 @@ elif app_view == "💬 Eco-Bot Chat Assistant":
         # Tries to find API key in environment
         st.session_state.chatbot = chatbot.create_chatbot()
 
+    # Sync Gemini active state
+    if not st.session_state.get("gemini_active", True):
+        st.session_state.chatbot.gemini_available = False
+
     # Chat history state
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
@@ -901,6 +915,9 @@ elif app_view == "💬 Eco-Bot Chat Assistant":
         # Get response
         with st.spinner("Eco-Bot typing..."):
             reply = st.session_state.chatbot.get_response(user_msg)
+            # Sync back if the chatbot disabled Gemini
+            if not st.session_state.chatbot.is_ai_enhanced:
+                st.session_state.gemini_active = False
 
         # Append bot reply
         st.session_state.chat_history.append({"role": "assistant", "content": reply})

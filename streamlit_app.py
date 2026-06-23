@@ -9,6 +9,7 @@ import google.generativeai as genai
 import os
 import recommendation_engine
 import gradcam
+import chatbot
 
 
 # TensorFlow is optional — app runs in demo mode if unavailable (e.g. Python 3.14 cloud)
@@ -245,6 +246,20 @@ with st.sidebar:
     st.subheader("🤖 Eco-Bot Assistant")
     st.caption("Ask anything about recycling, waste disposal, or assignment objectives.")
 
+    # Initialize chatbot instance
+    if "chatbot" not in st.session_state:
+        st.session_state.chatbot = chatbot.WasteManagementChatbot(gemini_api_key=GEMINI_API_KEY)
+
+    # Sync Gemini active state
+    if not st.session_state.get("gemini_active", True):
+        st.session_state.chatbot.gemini_available = False
+
+    # Display status
+    if st.session_state.chatbot.is_ai_enhanced:
+        st.caption("🟢 Eco-Bot Status: Online (Gemini AI API)")
+    else:
+        st.caption("⚪ Eco-Bot Status: Offline Rule-Based Mode active.")
+
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
 
@@ -259,33 +274,12 @@ with st.sidebar:
             st.markdown(user_chat)
 
         with st.chat_message("assistant"):
-            if GEMINI_API_KEY == "YOUR_GEMINI_API_KEY_HERE":
-                reply = (
-                    "🔌 **API Offline.** Set the `GEMINI_API_KEY` environment variable "
-                    "to enable live AI responses."
-                )
-                st.info(reply)
-            else:
-                with st.spinner("Thinking..."):
-                    try:
-                        agent      = genai.GenerativeModel("gemini-1.5-flash")
-                        sys_prompt = (
-                            "You are an expert waste management and recycling researcher. "
-                            f"Give a concise, helpful answer: {user_chat}"
-                        )
-                        reply = agent.generate_content(sys_prompt).text
-                        st.markdown(reply)
-                    except Exception as e:
-                        err_str = str(e)
-                        if "API key not valid" in err_str or "API_KEY_INVALID" in err_str:
-                            reply = (
-                                "🔑 **Invalid Gemini API Key.** The key provided in your Streamlit Cloud secrets or "
-                                "environment variables was rejected by Google. Please check your credentials."
-                            )
-                            st.warning(reply)
-                        else:
-                            reply = f"API Error: {e}"
-                            st.error(reply)
+            with st.spinner("Thinking..."):
+                reply = st.session_state.chatbot.get_response(user_chat)
+                st.markdown(reply)
+                # Sync back if the chatbot disabled Gemini
+                if not st.session_state.chatbot.is_ai_enhanced:
+                    st.session_state.gemini_active = False
 
         st.session_state.chat_history.append({"role": "assistant", "text": reply})
 
@@ -537,7 +531,16 @@ elif app_mode == "📸 Live Classification Workspace":
                                     break
                     except Exception as e:
                         err_str = str(e)
-                        if "API key not valid" in err_str or "API_KEY_INVALID" in err_str:
+                        err_lower = err_str.lower()
+                        is_auth_error = (
+                            "api key" in err_lower or
+                            "api_key" in err_lower or
+                            "invalid" in err_lower or
+                            "auth" in err_lower or
+                            "credential" in err_lower or
+                            "unauthorized" in err_lower
+                        )
+                        if is_auth_error:
                             st.session_state.gemini_active = False
                             st.toast("⚠️ Invalid Gemini API Key. Verification layer disabled.", icon="🔑")
 
