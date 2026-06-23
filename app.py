@@ -296,7 +296,7 @@ with st.sidebar:
     
     app_view = st.radio(
         "Navigation",
-        ["📸 Prediction Workspace", "📊 Analytics Dashboard", "💬 Eco-Bot Chat Assistant"],
+        ["📸 Prediction Workspace", "📊 Analytics Dashboard"],
         index=0,
     )
     
@@ -745,6 +745,60 @@ if app_view == "📸 Prediction Workspace":
             use_container_width=True
         )
 
+        # ── Row 6 (full width): 🤖 Eco-Bot Assistant ──
+        st.markdown("---")
+        st.markdown("## 🤖 Eco-Bot Assistant")
+        st.caption("Ask anything about recycling, waste disposal, or assignment objectives.")
+
+        # Initialize chatbot instance
+        if "chatbot" not in st.session_state:
+            st.session_state.chatbot = chatbot.create_chatbot()
+
+        # Sync Gemini active state
+        if not st.session_state.get("gemini_active", True):
+            st.session_state.chatbot.gemini_available = False
+
+        # Chat history state
+        if "chat_history" not in st.session_state:
+            st.session_state.chat_history = []
+
+        # Display status
+        if st.session_state.chatbot.is_ai_enhanced:
+            st.success("🟢 Eco-Bot Status: Online (Enhanced with Gemini AI API)", icon="🤖")
+        else:
+            st.info("⚪ Eco-Bot Status: Online (Offline Rule-Based Mode active). Provide GEMINI_API_KEY environment variable to unfreeze capacity.", icon="⚙️")
+
+        # Display history
+        for chat in st.session_state.chat_history:
+            with st.chat_message(chat["role"]):
+                st.markdown(chat["content"])
+
+        # Handle Input
+        user_msg = st.chat_input("Enter waste management query...", key="workspace_chat_input")
+        if user_msg:
+            # Append User Msg
+            st.session_state.chat_history.append({"role": "user", "content": user_msg})
+            with st.chat_message("user"):
+                st.markdown(user_msg)
+
+            # Get response
+            with st.spinner("Eco-Bot typing..."):
+                reply = st.session_state.chatbot.get_response(user_msg)
+                # Sync back if the chatbot disabled Gemini
+                if not st.session_state.chatbot.is_ai_enhanced:
+                    st.session_state.gemini_active = False
+
+            # Append bot reply
+            st.session_state.chat_history.append({"role": "assistant", "content": reply})
+            with st.chat_message("assistant"):
+                st.markdown(reply)
+                
+        # Clear history button
+        if len(st.session_state.chat_history) > 0:
+            if st.button("🧹 Clear Chat History", key="workspace_clear_chat"):
+                st.session_state.chat_history = []
+                st.rerun()
+
     elif not uploaded_file:
         with right_col:
             st.subheader("🧠 Diagnostic Results")
@@ -757,7 +811,7 @@ if app_view == "📸 Prediction Workspace":
             5. **Download Report**: Export a formatted PDF summary for submission.
             """)
     else:
-        with col_results:
+        with right_col:
             st.subheader("🧠 Diagnostic Results")
             st.info("👈 Please click '**Run AI Diagnostics**' in the input interface to analyze the target image.", icon="👈")
 
@@ -870,62 +924,4 @@ elif app_view == "📊 Analytics Dashboard":
             st.info("No saved model confusion matrices detected. Execute train.py to generate matrices.")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# VIEW 3: AI ECO-BOT ASSISTANT
-# ══════════════════════════════════════════════════════════════════════════════
-elif app_view == "💬 Eco-Bot Chat Assistant":
-    st.title("💬 Interactive Eco-Bot Waste Management Assistant")
-    st.write(
-        "Chat with Eco-Bot about anything related to waste separation, local recycling codes, "
-        "decomposition timelines, or assignment requirements. Operating fully offline via a built-in knowledge base."
-    )
 
-    # Initialize chatbot instance
-    if "chatbot" not in st.session_state:
-        # Tries to find API key in environment
-        st.session_state.chatbot = chatbot.create_chatbot()
-
-    # Sync Gemini active state
-    if not st.session_state.get("gemini_active", True):
-        st.session_state.chatbot.gemini_available = False
-
-    # Chat history state
-    if "chat_history" not in st.session_state:
-        st.session_state.chat_history = []
-
-    # Display status
-    if st.session_state.chatbot.is_ai_enhanced:
-        st.success("🟢 Eco-Bot Status: Online (Enhanced with Gemini AI API)", icon="🤖")
-    else:
-        st.info("⚪ Eco-Bot Status: Online (Offline Rule-Based Mode active). Provide GEMINI_API_KEY environment variable to unfreeze full generative capacity.", icon="⚙️")
-
-    # Display history
-    for chat in st.session_state.chat_history:
-        with st.chat_message(chat["role"]):
-            st.markdown(chat["content"])
-
-    # Handle Input
-    user_msg = st.chat_input("Enter waste management query...")
-    if user_msg:
-        # Append User Msg
-        st.session_state.chat_history.append({"role": "user", "content": user_msg})
-        with st.chat_message("user"):
-            st.markdown(user_msg)
-
-        # Get response
-        with st.spinner("Eco-Bot typing..."):
-            reply = st.session_state.chatbot.get_response(user_msg)
-            # Sync back if the chatbot disabled Gemini
-            if not st.session_state.chatbot.is_ai_enhanced:
-                st.session_state.gemini_active = False
-
-        # Append bot reply
-        st.session_state.chat_history.append({"role": "assistant", "content": reply})
-        with st.chat_message("assistant"):
-            st.markdown(reply)
-            
-    # Clear history button
-    if len(st.session_state.chat_history) > 0:
-        if st.button("🧹 Clear Chat History"):
-            st.session_state.chat_history = []
-            st.rerun()
