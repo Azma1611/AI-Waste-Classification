@@ -453,9 +453,14 @@ with st.sidebar:
     )
     st.markdown("---")
 
+    # Persist the app mode selection in session_state so it is preserved across reruns
+    if "app_mode" not in st.session_state:
+        st.session_state["app_mode"] = "📊 System Setup & EDA"
+
     app_mode = st.radio(
         "Switch Dashboard View:",
         ["📊 System Setup & EDA", "📸 Live Classification Workspace"],
+        key="app_mode"
     )
 
     st.markdown("---")
@@ -875,7 +880,6 @@ elif app_mode == "📸 Live Classification Workspace":
         impact_score = impact_map.get(impact, 50)
         
 
-
         # ── Row 3 (full width): XAI Explainability Visualizations ──
         st.markdown("---")
         method_title = "Score-CAM" if xai_method.startswith("Score-CAM") else "Grad-CAM++"
@@ -1034,3 +1038,4 @@ elif app_mode == "📸 Live Classification Workspace":
             f"⚠️ {impact} Impact  —  Score: {impact_score}/100</div>",
             unsafe_allow_html=True,
         )
+
