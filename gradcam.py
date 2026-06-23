@@ -3,12 +3,12 @@ gradcam.py
 ==========
 MODULE 10: Explainable AI — Grad-CAM & Feature Visualization
 
-Implements Gradient-weighted Class Activation Mapping (Grad-CAM) to
-explain why the model made a specific prediction by highlighting the
+Implements Gradient-weighted Class Activation Mapping (Grad-CAM) and Grad-CAM++
+to explain why the model made a specific prediction by highlighting the
 image regions that most influenced the classification decision.
 
-Also includes intermediate feature visualization for deeper model
-interpretability.
+Uses Guided Image Filtering, soft thresholding, and gamma correction for
+pixel-precise, research-paper quality object boundary localization.
 
 Author  : AI & Data Science Engineering Team
 Project : AI-Powered Smart Waste Classification & Recycling System
@@ -30,13 +30,15 @@ except ImportError:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# GRAD-CAM IMPLEMENTATION
+# UTILITIES AND LAYERS
 # ══════════════════════════════════════════════════════════════════════════════
 
-def find_last_conv_layer(model) -> str:
+def find_target_explain_layer(model) -> str:
     """
-    Automatically find the last convolutional layer in the model.
-    Works with custom CNNs, MobileNetV2, and ResNet50.
+    Finds the target convolutional or activation layer to use for Grad-CAM.
+    For MobileNetV2: targets 'block_13_expand_relu' (14x14x576) for 4x resolution.
+    For ResNet50: targets 'conv4_block6_out' (14x14x1024).
+    Otherwise falls back to the final convolutional layer.
 
     Parameters
     ----------
@@ -44,27 +46,57 @@ def find_last_conv_layer(model) -> str:
 
     Returns
     -------
-    str : Name of the last Conv2D layer
+    str : Name of the target layer
     """
     if not TF_AVAILABLE:
         return None
 
-    # Search backwards through layers (including nested models) to find the last Conv2D dynamically.
-    # This automatically finds the last convolutional layer without hardcoding a name.
-    for layer in reversed(model.layers):
+    # Check for functional sub-models
+    base_model = None
+    for layer in model.layers:
         if hasattr(layer, "layers") and isinstance(layer, tf.keras.Model):
-            for sub_layer in reversed(layer.layers):
-                if isinstance(sub_layer, tf.keras.layers.Conv2D):
-                    return sub_layer.name
-        elif isinstance(layer, tf.keras.layers.Conv2D):
-            return layer.name
+            base_model = layer
+            break
 
-    # Known final layers as fallback
+    if base_model is not None:
+        model_name_lower = base_model.name.lower()
+        if "mobilenet" in model_name_lower:
+            # MobileNetV2 high-res target layer (14x14x576)
+            target_layers = ["block_13_expand_relu", "block_13_expand"]
+            for name in target_layers:
+                try:
+                    base_model.get_layer(name)
+                    return name
+                except ValueError:
+                    continue
+        elif "resnet" in model_name_lower:
+            # ResNet50 high-res target layer (14x14x1024)
+            target_layers = ["conv4_block6_out", "conv4_block6_3_conv"]
+            for name in target_layers:
+                try:
+                    base_model.get_layer(name)
+                    return name
+                except ValueError:
+                    continue
+
+        # Backward search inside base model for any Conv2D if targets not found
+        for sub_layer in reversed(base_model.layers):
+            if isinstance(sub_layer, tf.keras.layers.Conv2D):
+                return sub_layer.name
+    else:
+        # Backward search in flat model
+        for layer in reversed(model.layers):
+            if isinstance(layer, tf.keras.layers.Conv2D):
+                return layer.name
+
+    # Fallback to known names
     known_final_layers = [
         "conv5_block3_3_conv",
         "conv5_block3_out",
         "out_relu",
         "block_16_project",
+        "block_13_expand_relu",
+        "conv4_block6_out"
     ]
     for name in known_final_layers:
         try:
@@ -74,6 +106,13 @@ def find_last_conv_layer(model) -> str:
             continue
 
     return None
+
+
+def find_last_conv_layer(model) -> str:
+    """
+    Legacy wrapper for find_target_explain_layer.
+    """
+    return find_target_explain_layer(model)
 
 
 def _get_nested_layer(model, layer_name):
@@ -97,27 +136,102 @@ def _get_nested_layer(model, layer_name):
     raise ValueError(f"Layer '{layer_name}' not found in model or sub-models.")
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# GUIDED IMAGE FILTERING
+# ══════════════════════════════════════════════════════════════════════════════
+
+def guided_filter(guidance: np.ndarray, target: np.ndarray, r: int = 8, eps: float = 1e-3) -> np.ndarray:
+    """
+    Guided image filter for edge-preserving smoothing and detail transfer.
+    Aligns the boundaries of the heatmap with the edges of the guidance image.
+    
+    Parameters
+    ----------
+    guidance : np.ndarray
+        RGB image of shape (H, W, 3) or grayscale image of shape (H, W), in range [0, 255] or [0, 1].
+    target : np.ndarray
+        Heatmap of shape (H, W), values in range [0, 1].
+    r : int
+        Local window radius.
+    eps : float
+        Regularization parameter (variance threshold).
+        
+    Returns
+    -------
+    refined_target : np.ndarray
+        Refined heatmap of shape (H, W), in range [0, 1].
+    """
+    # Convert guidance to grayscale and normalize to [0, 1]
+    if len(guidance.shape) == 3:
+        I = cv2.cvtColor(guidance, cv2.COLOR_RGB2GRAY)
+    else:
+        I = guidance.copy()
+        
+    if I.max() > 1.0:
+        I = I.astype(np.float32) / 255.0
+        
+    p = target.astype(np.float32)
+    
+    # Calculate local means using box filter
+    mean_I = cv2.boxFilter(I, -1, (r, r))
+    mean_p = cv2.boxFilter(p, -1, (r, r))
+    mean_Ip = cv2.boxFilter(I * p, -1, (r, r))
+    
+    # Covariance of (I, p) in each local patch
+    cov_Ip = mean_Ip - mean_I * mean_p
+    
+    # Variance of I in each local patch
+    mean_II = cv2.boxFilter(I * I, -1, (r, r))
+    var_I = mean_II - mean_I * mean_I
+    
+    # Linear coefficients a and b
+    a = cov_Ip / (var_I + eps)
+    b = mean_p - a * mean_I
+    
+    # Mean of a and b over local patch
+    mean_a = cv2.boxFilter(a, -1, (r, r))
+    mean_b = cv2.boxFilter(b, -1, (r, r))
+    
+    # Refined target
+    q = mean_a * I + mean_b
+    return np.clip(q, 0.0, 1.0)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GRAD-CAM / GRAD-CAM++ ENGINE
+# ══════════════════════════════════════════════════════════════════════════════
+
 def generate_gradcam_heatmap(
     model,
     img_array: np.ndarray,
     target_class_idx: int = None,
     conv_layer_name: str = None,
+    use_gradcam_plusplus: bool = True,
+    threshold: float = 0.20,
+    gamma: float = 1.5,
 ) -> np.ndarray:
     """
-    Generate a Grad-CAM heatmap for a given image and model.
+    Generate a highly localized Grad-CAM or Grad-CAM++ heatmap for a given image and model.
+    Aligns preprocessing with the backbone, applies soft thresholding and gamma correction.
 
     Parameters
     ----------
     model : tf.keras.Model
         The trained classification model.
     img_array : np.ndarray
-        Preprocessed image array of shape (1, 224, 224, 3).
+        Preprocessed image array of shape (1, 224, 224, 3), values in [0, 1].
     target_class_idx : int, optional
         Class index to compute the heatmap for. If None, uses the
         predicted class (argmax).
     conv_layer_name : str, optional
         Name of the convolutional layer to use. If None, automatically
-        detects the last conv layer.
+        detects the target layer.
+    use_gradcam_plusplus : bool
+        If True, applies Grad-CAM++ using first, second, and third-order derivatives.
+    threshold : float
+        Soft threshold value (0.0 to 1.0) to remove background activation noise.
+    gamma : float
+        Gamma exponent for contrast enhancement and peak focusing.
 
     Returns
     -------
@@ -126,14 +240,14 @@ def generate_gradcam_heatmap(
     """
     if not TF_AVAILABLE or model is None:
         # Return a placeholder heatmap
-        return np.random.rand(7, 7).astype(np.float32)
+        return np.random.rand(14, 14).astype(np.float32)
 
     # Find the target convolutional layer
     if conv_layer_name is None:
-        conv_layer_name = find_last_conv_layer(model)
+        conv_layer_name = find_target_explain_layer(model)
         if conv_layer_name is None:
             print("[Grad-CAM Diagnostic] Error: No suitable conv layer found!")
-            return np.ones((7, 7), dtype=np.float32) * 0.5
+            return np.ones((14, 14), dtype=np.float32) * 0.5
 
     # Check if we have a nested base model (e.g. resnet50, mobilenetv2)
     base_model = None
@@ -149,10 +263,18 @@ def generate_gradcam_heatmap(
         last_layer.activation = tf.keras.activations.linear
 
     try:
-        img_tensor = tf.cast(img_array, tf.float32)
-
+        # Preprocess input image based on detected backbone
+        img_tensor = tf.convert_to_tensor(img_array, dtype=tf.float32)
+        
         if base_model is not None:
-            # Reconstruct the forward pass of the main model to enable gradient flow through functional sub-models
+            # Scale raw input [0, 1] to [0, 255] and apply backbone-specific preprocessing
+            x_prep = img_tensor * 255.0
+            model_name_lower = base_model.name.lower()
+            if "resnet50" in model_name_lower:
+                x_prep = tf.keras.applications.resnet50.preprocess_input(x_prep)
+            elif "mobilenet" in model_name_lower:
+                x_prep = tf.keras.applications.mobilenet_v2.preprocess_input(x_prep)
+            
             target_layer = _get_nested_layer(base_model, conv_layer_name)
             
             # Sub-model for the base backbone
@@ -176,16 +298,22 @@ def generate_gradcam_heatmap(
                     x = hl(x)
                 return x
 
-            with tf.GradientTape() as tape:
-                tape.watch(img_tensor)
-                conv_outputs, base_features = base_grad_model(img_tensor)
-                predictions = run_head(base_features)
-                
-                if target_class_idx is None:
-                    target_class_idx = tf.argmax(predictions[0]).numpy()
-                loss = predictions[:, target_class_idx]
-                
-            grads = tape.gradient(loss, conv_outputs)
+            # Grad-CAM++ calculation using triple-nested tapes
+            with tf.GradientTape() as tape3:
+                with tf.GradientTape() as tape2:
+                    with tf.GradientTape() as tape1:
+                        conv_outputs, base_features = base_grad_model(x_prep)
+                        predictions = run_head(base_features)
+                        
+                        if target_class_idx is None:
+                            target_class_idx = tf.argmax(predictions[0]).numpy()
+                        # Use log-probability to avoid softmax saturation and enable non-zero 2nd/3rd derivatives
+                        loss = tf.math.log(predictions[:, target_class_idx] + 1e-8)
+                        
+                    grads_first = tape1.gradient(loss, conv_outputs)
+                grads_second = tape2.gradient(grads_first, conv_outputs)
+            grads_third = tape3.gradient(grads_second, conv_outputs)
+            
         else:
             # Standard flat model execution
             target_layer = _get_nested_layer(model, conv_layer_name)
@@ -193,37 +321,68 @@ def generate_gradcam_heatmap(
                 inputs=model.input,
                 outputs=[target_layer.output, model.output]
             )
-            with tf.GradientTape() as tape:
-                tape.watch(img_tensor)
-                conv_outputs, predictions = grad_model(img_tensor)
-                if target_class_idx is None:
-                    target_class_idx = tf.argmax(predictions[0]).numpy()
-                loss = predictions[:, target_class_idx]
-            grads = tape.gradient(loss, conv_outputs)
+            with tf.GradientTape() as tape3:
+                with tf.GradientTape() as tape2:
+                    with tf.GradientTape() as tape1:
+                        conv_outputs, predictions = grad_model(img_tensor)
+                        if target_class_idx is None:
+                            target_class_idx = tf.argmax(predictions[0]).numpy()
+                        # Use log-probability to avoid softmax saturation and enable non-zero 2nd/3rd derivatives
+                        loss = tf.math.log(predictions[:, target_class_idx] + 1e-8)
+                    grads_first = tape1.gradient(loss, conv_outputs)
+                grads_second = tape2.gradient(grads_first, conv_outputs)
+            grads_third = tape3.gradient(grads_second, conv_outputs)
 
-        if grads is None:
+        if grads_first is None:
             print("[Grad-CAM Diagnostic] Error: Gradients are None!")
-            return np.ones((7, 7), dtype=np.float32) * 0.5
+            return np.ones((14, 14), dtype=np.float32) * 0.5
 
-        # Global average pooling of gradients → channel importance weights
-        pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
-
-        # Weight the conv outputs by gradient importance
+        # Weight the conv outputs
         conv_outputs_val = conv_outputs[0]
-        heatmap_tensor = tf.reduce_sum(conv_outputs_val * pooled_grads, axis=-1)
+        grads_first_val = grads_first[0]
+        
+        if use_gradcam_plusplus:
+            grads_second_val = grads_second[0]
+            grads_third_val = grads_third[0]
+            
+            # Alphas coefficients for Grad-CAM++
+            numerator = grads_second_val
+            sum_act = tf.reduce_sum(conv_outputs_val, axis=(0, 1), keepdims=True)
+            denominator = 2.0 * grads_second_val + sum_act * grads_third_val
+            denominator = tf.where(denominator != 0.0, denominator, tf.ones_like(denominator))
+            
+            alphas = numerator / denominator
+            weights = tf.reduce_sum(alphas * tf.maximum(grads_first_val, 0.0), axis=(0, 1))
+        else:
+            # Standard Grad-CAM average gradients
+            weights = tf.reduce_mean(grads_first_val, axis=(0, 1))
+
+        # Sum along channel dimension
+        heatmap_tensor = tf.reduce_sum(weights * conv_outputs_val, axis=-1)
 
         # ReLU — only keep positive contributions
-        heatmap = heatmap_tensor.numpy()
-        heatmap = np.maximum(heatmap, 0)
+        heatmap = tf.maximum(heatmap_tensor, 0.0).numpy()
 
-        # Normalize to [0, 1] using NumPy as requested
+        # Robust Min-Max Normalization to establish a true zero baseline
+        heatmap_min = np.min(heatmap)
         heatmap_max = np.max(heatmap)
-        heatmap /= heatmap_max + 1e-8
+        if heatmap_max - heatmap_min > 1e-8:
+            heatmap = (heatmap - heatmap_min) / (heatmap_max - heatmap_min + 1e-8)
+        else:
+            heatmap = np.zeros_like(heatmap)
+
+        # Soft Thresholding to clear out background noise
+        if threshold > 0.0:
+            heatmap = np.where(heatmap < threshold, 0.0, (heatmap - threshold) / (1.0 - threshold + 1e-8))
+
+        # Gamma Correction to focus peak activations
+        if gamma > 0.0:
+            heatmap = np.power(heatmap, gamma)
 
         # Print diagnostics to log stream
         print(f"[Grad-CAM Diagnostic] Target Class Index: {target_class_idx}")
         print(f"[Grad-CAM Diagnostic] Selected Layer Name: {conv_layer_name}")
-        print(f"[Grad-CAM Diagnostic] Gradients Min/Max: {grads.numpy().min():.6f}/{grads.numpy().max():.6f}")
+        print(f"[Grad-CAM Diagnostic] Gradients Min/Max: {grads_first_val.numpy().min():.6f}/{grads_first_val.numpy().max():.6f}")
         print(f"[Grad-CAM Diagnostic] Heatmap Min/Max: {heatmap.min():.6f}/{heatmap.max():.6f}")
 
         return heatmap
@@ -237,14 +396,15 @@ def generate_gradcam_heatmap(
 def overlay_heatmap_on_image(
     original_image: np.ndarray,
     heatmap: np.ndarray,
-    alpha: float = 0.3,
+    alpha: float = 0.50,
     colormap: int = cv2.COLORMAP_JET,
     target_size: tuple = (224, 224),
+    r: int = 8,
+    eps: float = 1e-3,
 ) -> np.ndarray:
     """
-    Superimpose a Grad-CAM heatmap onto the original image.
-    Uses variable alpha blending based on heatmap intensity to ensure
-    background areas remain transparent and clean.
+    Superimpose a refined Grad-CAM heatmap onto the original image.
+    Uses Guided Image Filtering for edge refinement and dynamic alpha masking.
 
     Parameters
     ----------
@@ -258,14 +418,16 @@ def overlay_heatmap_on_image(
         OpenCV colormap constant (default: JET).
     target_size : tuple
         Output image size (width, height).
+    r : int
+        Guided filter window radius.
+    eps : float
+        Guided filter regularization epsilon.
 
     Returns
     -------
     superimposed : np.ndarray
         RGB uint8 image with heatmap overlay.
     """
-    from PIL import Image as PILImage
-
     # Handle PIL Image input
     if hasattr(original_image, "convert"):
         original_image = np.array(
@@ -276,12 +438,15 @@ def overlay_heatmap_on_image(
     if original_image.shape[:2] != target_size[::-1]:
         original_image = cv2.resize(original_image, target_size)
 
-    # Resize heatmap to match image using cv2.INTER_LINEAR
-    heatmap_resized = cv2.resize(heatmap, target_size, interpolation=cv2.INTER_LINEAR)
+    # Resize heatmap to match image using cv2.INTER_LANCZOS4 for high fidelity
+    heatmap_resized = cv2.resize(heatmap, target_size, interpolation=cv2.INTER_LANCZOS4)
+
+    # Apply Guided Filtering using the original image to align the activations with boundaries
+    heatmap_refined = guided_filter(original_image, heatmap_resized, r=r, eps=eps)
 
     # Apply colormap
     heatmap_colored = cv2.applyColorMap(
-        np.uint8(255 * heatmap_resized), colormap
+        np.uint8(255 * heatmap_refined), colormap
     )
     heatmap_colored = cv2.cvtColor(heatmap_colored, cv2.COLOR_BGR2RGB)
 
@@ -292,15 +457,13 @@ def overlay_heatmap_on_image(
         else:
             original_image = original_image.astype(np.uint8)
 
-    # Blend with variable intensity based on heatmap values
-    # mask has shape (H, W, 1), values in [0, 1]
-    mask = np.expand_dims(heatmap_resized, axis=-1)
+    # Blend: original * (1 - alpha * mask) + heatmap_colored * (alpha * mask)
+    # The mask (refined heatmap) acts as a dynamic spatial weight
+    mask = np.expand_dims(heatmap_refined, axis=-1)
     
-    # Convert arrays to float for interpolation calculations
     original_float = original_image.astype(np.float32)
     heatmap_colored_float = heatmap_colored.astype(np.float32)
     
-    # Blend: original * (1 - alpha * mask) + heatmap_colored * (alpha * mask)
     blended = original_float * (1.0 - alpha * mask) + heatmap_colored_float * (alpha * mask)
     superimposed = np.clip(blended, 0, 255).astype(np.uint8)
 
@@ -421,7 +584,7 @@ def visualize_intermediate_features(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# CONVENIENCE: FULL GRAD-CAM PIPELINE
+# FULL GRAD-CAM PIPELINE
 # ══════════════════════════════════════════════════════════════════════════════
 
 def explain_prediction(
@@ -432,6 +595,7 @@ def explain_prediction(
 ) -> dict:
     """
     Complete explainability pipeline for a single image prediction.
+    Generates a single edge-refined overlay image with zero background noise.
 
     Parameters
     ----------
@@ -473,9 +637,15 @@ def explain_prediction(
 
     pred_class = class_names[pred_idx]
 
-    # Generate Grad-CAM heatmap (resolve conv layer name for logs)
-    conv_layer_name = find_last_conv_layer(model)
-    heatmap = generate_gradcam_heatmap(model, img_batch, target_class_idx=pred_idx, conv_layer_name=conv_layer_name)
+    # Generate Grad-CAM++ heatmap
+    conv_layer_name = find_target_explain_layer(model)
+    heatmap = generate_gradcam_heatmap(
+        model, 
+        img_batch, 
+        target_class_idx=pred_idx, 
+        conv_layer_name=conv_layer_name,
+        use_gradcam_plusplus=True
+    )
 
     # Print diagnostics for debugging
     print(f"[Grad-CAM Diagnostic] Predicted Class: {pred_class}")
@@ -483,24 +653,17 @@ def explain_prediction(
     print(f"[Grad-CAM Diagnostic] Selected Grad-CAM Layer: {conv_layer_name}")
     print(f"[Grad-CAM Diagnostic] Heatmap Min/Max: {heatmap.min():.4f}/{heatmap.max():.4f}")
 
-    # Create overlay
-    overlay = overlay_heatmap_on_image(pil_image, heatmap)
+    # Create overlay (using alpha=0.5 for optimal visual pop and edge alignment)
+    overlay = overlay_heatmap_on_image(pil_image, heatmap, alpha=0.5)
 
     # Save outputs if requested
     if save_dir:
         os.makedirs(save_dir, exist_ok=True)
+        # Write only ONE final high-quality overlay image
         cv2.imwrite(
             os.path.join(save_dir, "gradcam_overlay.png"),
             cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR),
         )
-        plt.figure(figsize=(6, 6))
-        plt.imshow(heatmap, cmap="jet")
-        plt.title(f"Grad-CAM: {pred_class} ({confidence*100:.1f}%)")
-        plt.colorbar(label="Activation Intensity")
-        plt.axis("off")
-        plt.tight_layout()
-        plt.savefig(os.path.join(save_dir, "gradcam_heatmap.png"), dpi=150)
-        plt.close()
 
     return {
         "predicted_class": pred_class,
@@ -510,10 +673,6 @@ def explain_prediction(
         "predictions": predictions,
     }
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# CLI DEMO
-# ══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
     print("=" * 60)
@@ -528,5 +687,4 @@ if __name__ == "__main__":
     print("    from gradcam import explain_prediction")
     print("    result = explain_prediction(model, pil_image)")
     print("    overlay = result['overlay']")
-    print("    heatmap = result['heatmap']")
     print("=" * 60)

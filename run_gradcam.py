@@ -3,102 +3,61 @@ import cv2
 import numpy as np
 import tensorflow as tf
 from PIL import Image
-import matplotlib.pyplot as plt
+import gradcam
 
 MODEL_PATH = "model/waste_model.keras"
 CLASSES = ["Plastic", "Paper", "Glass", "Metal", "Organic Waste", "E-Waste"]
 
 def get_gradcam_overlay(image_path, target_class_name="Glass"):
+    if not os.path.exists(MODEL_PATH):
+        print(f"Error: Model not found at {MODEL_PATH}")
+        return
+        
     model = tf.keras.models.load_model(MODEL_PATH)
+    
+    if target_class_name not in CLASSES:
+        print(f"Error: target_class_name '{target_class_name}' must be one of {CLASSES}")
+        return
     target_idx = CLASSES.index(target_class_name)
 
-    # 1. Preprocess input image
+    # 1. Load Image
+    if not os.path.exists(image_path):
+        print(f"Error: Image not found at {image_path}")
+        return
     orig_img = Image.open(image_path).convert("RGB")
+    
+    # 2. Get predictions and generate heatmap using our robust pipeline
     img_resized = orig_img.resize((224, 224))
     img_array = np.array(img_resized, dtype=np.float32) / 255.0
     img_batch = np.expand_dims(img_array, axis=0)
-
-    # 2. Automatically discover last Conv layer
-    last_conv_layer_name = None
-    for layer in model.layers:
-        if hasattr(layer, "layers"): # nested model check
-            for sub in layer.layers:
-                if isinstance(sub, tf.keras.layers.Conv2D):
-                    last_conv_layer_name = sub.name
-                if sub.name in ("out_relu", "conv5_block3_3_relu"):
-                    last_conv_layer_name = sub.name
-        elif isinstance(layer, tf.keras.layers.Conv2D):
-            last_conv_layer_name = layer.name
-
-    print(f"Discovered last Conv layer: {last_conv_layer_name}")
-
-    # Retrieve layers to build gradient model
-    # Handle nested architecture lookup
-    try:
-        backbone = model.get_layer("mobilenetv2_1.00_224") # default layer name
-        target_layer = backbone.get_layer(last_conv_layer_name)
-        grad_model = tf.keras.Model(
-            inputs=model.input,
-            outputs=[target_layer.output, model.output]
-        )
-    except Exception:
-        try:
-            target_layer = model.get_layer(last_conv_layer_name)
-            grad_model = tf.keras.Model(inputs=model.input, outputs=[target_layer.output, model.output])
-        except Exception as e:
-            # Direct backup
-            print(f"Error accessing layer: {e}. Attempting direct submodel extraction...")
-            # Extract nested layers manually
-            sub_model = [l for l in model.layers if hasattr(l, "layers")][0]
-            target_layer = sub_model.get_layer(last_conv_layer_name)
-            grad_model = tf.keras.Model(inputs=model.input, outputs=[target_layer.output, model.output])
-
-    # 3. Compute Gradients
-    img_tensor = tf.cast(img_batch, tf.float32)
-    with tf.GradientTape() as tape:
-        tape.watch(img_tensor)
-        conv_outputs, predictions = grad_model(img_tensor)
-        loss = predictions[:, target_idx]
-
-    grads = tape.gradient(loss, conv_outputs)
-    pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
-
-    conv_outputs = conv_outputs[0]
-    heatmap = tf.reduce_sum(conv_outputs * pooled_grads, axis=-1).numpy()
-    heatmap = np.maximum(heatmap, 0)
-    if heatmap.max() != 0:
-        heatmap = heatmap / heatmap.max()
-
-    # 4. Generate visual overlay
-    heatmap_resized = cv2.resize(heatmap, (224, 224))
-    heatmap_colored = cv2.applyColorMap(np.uint8(255 * heatmap_resized), cv2.COLORMAP_JET)
-    heatmap_colored = cv2.cvtColor(heatmap_colored, cv2.COLOR_BGR2RGB)
     
-    orig_np = np.array(img_resized)
-    superimposed = cv2.addWeighted(orig_np, 0.6, heatmap_colored, 0.4, 0)
+    # Find layer and generate Grad-CAM++ heatmap
+    conv_layer_name = gradcam.find_target_explain_layer(model)
+    print(f"Targeting layer for explanation: {conv_layer_name}")
+    
+    heatmap = gradcam.generate_gradcam_heatmap(
+        model,
+        img_batch,
+        target_class_idx=target_idx,
+        conv_layer_name=conv_layer_name,
+        use_gradcam_plusplus=True
+    )
+    
+    # 3. Generate visual overlay with Guided Image Filtering (Research-Quality)
+    superimposed = gradcam.overlay_heatmap_on_image(img_resized, heatmap, alpha=0.5)
 
-    # Save output
+    # 4. Save ONLY the final single overlay image directly (no subplots)
     os.makedirs("scratch", exist_ok=True)
     out_path = "scratch/gradcam_waste_diagnostic.png"
-    plt.figure(figsize=(10, 5))
-    plt.subplot(1, 2, 1)
-    plt.imshow(img_resized)
-    plt.title("Original Input")
-    plt.axis("off")
     
-    plt.subplot(1, 2, 2)
-    plt.imshow(superimposed)
-    plt.title(f"Grad-CAM overlay for '{target_class_name}'")
-    plt.axis("off")
-    
-    plt.tight_layout()
-    plt.savefig(out_path, dpi=150)
-    plt.close()
-    print(f"Saved diagnostic overlay: {out_path}")
+    # Convert RGB to BGR for cv2 writing
+    cv2.imwrite(out_path, cv2.cvtColor(superimposed, cv2.COLOR_RGB2BGR))
+    print(f"Saved research-quality diagnostic overlay directly to: {out_path}")
 
 if __name__ == "__main__":
     import sys
     if len(sys.argv) < 2:
-        print("Usage: python run_gradcam.py <path_to_image>")
+        print("Usage: python run_gradcam.py <path_to_image> [target_class_name]")
     else:
-        get_gradcam_overlay(sys.argv[1])
+        target_cls = sys.argv[2] if len(sys.argv) > 2 else "Glass"
+        get_gradcam_overlay(sys.argv[1], target_cls)

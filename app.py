@@ -487,23 +487,12 @@ if app_view == "📸 Prediction Workspace":
         if is_uniform:
             st.warning("⚠️ Low attention localization - model may be uncertain.", icon="⚠️")
             
-        overlay_img = gradcam.overlay_heatmap_on_image(pil_img, heatmap, alpha=0.3)
+        # Generate the single high-resolution overlay image (with alpha=0.5 for optimal visual pop and edge-preserving filtering)
+        overlay_img = gradcam.overlay_heatmap_on_image(pil_img, heatmap, alpha=0.5)
         
-        # Colorized Heatmap only resized using cv2.INTER_LINEAR
-        h_w = pil_img.height if hasattr(pil_img, 'height') else 224
-        w_w = pil_img.width if hasattr(pil_img, 'width') else 224
-        heatmap_resized = cv2.resize(heatmap, (w_w, h_w), interpolation=cv2.INTER_LINEAR)
-        heatmap_colored = cv2.applyColorMap(np.uint8(255 * heatmap_resized), cv2.COLORMAP_JET)
-        heatmap_colored = cv2.cvtColor(heatmap_colored, cv2.COLOR_BGR2RGB)
-        
-        # Center and display side-by-side using 3 columns
-        col_img1, col_img2, col_img3 = st.columns(3)
-        with col_img1:
-            st.image(pil_img, caption="Original Image", use_container_width=True)
-        with col_img2:
-            st.image(heatmap_colored, caption="Heatmap Only (JET)", use_container_width=True)
-        with col_img3:
-            st.image(overlay_img, caption="Grad-CAM Overlay (Alpha=0.3)", use_container_width=True)
+        # Display only the single Grad-CAM++ overlay image
+        st.image(overlay_img, caption=f"Grad-CAM++ Explainability Overlay for '{pred_class}' (Research-Quality)", use_container_width=True)
+
 
         # Row 3 (full width): Recycling Recommendations
         st.markdown("---")
