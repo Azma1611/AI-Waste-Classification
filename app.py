@@ -27,6 +27,7 @@ from PIL import Image
 import streamlit as st
 from fpdf import FPDF
 import google.generativeai as genai
+from html import escape
 
 # Configure Gemini API
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "YOUR_GEMINI_API_KEY_HERE")
@@ -126,8 +127,211 @@ st.markdown("""
         object-fit: contain !important;
         border-radius: 8px;
     }
+    .st-key-ecobot_widget_root {
+        position: fixed;
+        bottom: 1.25rem;
+        right: 1.25rem;
+        z-index: 999999;
+        width: min(390px, calc(100vw - 2rem));
+        pointer-events: none;
+    }
+    .st-key-ecobot_widget_root * {
+        pointer-events: auto;
+    }
+    .st-key-ecobot_panel {
+        max-height: min(72vh, 620px);
+        overflow: hidden;
+        margin-bottom: 0.75rem;
+        padding: 1rem;
+        border: 1px solid rgba(45, 61, 90, 0.95);
+        border-radius: 8px;
+        background: linear-gradient(145deg, rgba(23, 32, 48, 0.98), rgba(11, 15, 25, 0.98));
+        box-shadow: 0 18px 45px rgba(0, 0, 0, 0.42);
+        backdrop-filter: blur(16px);
+        animation: ecobot-open 180ms ease-out;
+    }
+    .ecobot-panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-bottom: 0.4rem;
+    }
+    .ecobot-panel-title {
+        color: #f8fafc;
+        font-size: 1rem;
+        font-weight: 800;
+        line-height: 1.2;
+    }
+    .ecobot-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        color: #cbd5e1;
+        font-size: 0.78rem;
+        white-space: nowrap;
+    }
+    .ecobot-status-dot {
+        width: 0.55rem;
+        height: 0.55rem;
+        border-radius: 999px;
+        box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12);
+    }
+    .ecobot-status-dot.online {
+        background: #10b981;
+    }
+    .ecobot-status-dot.offline {
+        background: #94a3b8;
+        box-shadow: 0 0 0 4px rgba(148, 163, 184, 0.14);
+    }
+    .st-key-ecobot_history {
+        border: 1px solid rgba(45, 61, 90, 0.65);
+        border-radius: 8px;
+        background: rgba(2, 6, 23, 0.24);
+        padding: 0.45rem;
+    }
+    .st-key-ecobot_panel [data-testid="stChatMessage"] {
+        padding: 0.55rem 0.65rem;
+        border-radius: 8px;
+        background: rgba(15, 23, 42, 0.7);
+        border: 1px solid rgba(45, 61, 90, 0.45);
+    }
+    .st-key-ecobot_panel [data-testid="stForm"] {
+        border: 0;
+        padding: 0;
+    }
+    .st-key-ecobot_panel [data-testid="stTextInput"] input {
+        border-radius: 8px;
+        border-color: rgba(45, 61, 90, 0.95);
+        background: #0b0f19;
+        color: #f8fafc;
+    }
+    .st-key-ecobot_panel .stFormSubmitButton button,
+    .st-key-ecobot_panel .stButton button {
+        border-radius: 8px;
+        min-height: 2.45rem;
+    }
+    .st-key-ecobot_toggle button {
+        min-width: 142px;
+        min-height: 3rem;
+        border-radius: 999px;
+        border: 1px solid rgba(139, 92, 246, 0.7);
+        background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+        color: #ffffff;
+        font-weight: 800;
+        box-shadow: 0 12px 30px rgba(109, 40, 217, 0.25);
+    }
+    .st-key-ecobot_toggle button:hover {
+        border-color: #a78bfa;
+        box-shadow: 0 16px 34px rgba(139, 92, 246, 0.28);
+        transform: translateY(-1px);
+    }
+    @keyframes ecobot-open {
+        from {
+            opacity: 0;
+            transform: translateY(14px) scale(0.98);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+    @media (max-width: 640px) {
+        .st-key-ecobot_widget_root {
+            bottom: 0.75rem;
+            right: 0.75rem;
+            width: calc(100vw - 1.5rem);
+        }
+        .st-key-ecobot_panel {
+            max-height: 76vh;
+            padding: 0.8rem;
+        }
+        .ecobot-panel-header {
+            align-items: flex-start;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+        .st-key-ecobot_toggle button {
+            width: 100%;
+        }
+    }
 </style>
 """,unsafe_allow_html=True)
+
+
+def render_ecobot_widget():
+    """Render the floating Eco-Bot support widget without changing chatbot logic."""
+    if "ecobot_open" not in st.session_state:
+        st.session_state.ecobot_open = False
+
+    if "chatbot" not in st.session_state:
+        st.session_state.chatbot = chatbot.create_chatbot()
+
+    if not st.session_state.get("gemini_active", True):
+        st.session_state.chatbot.gemini_available = False
+
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+
+    with st.container(key="ecobot_widget_root"):
+        if st.session_state.ecobot_open:
+            with st.container(key="ecobot_panel"):
+                is_online = st.session_state.chatbot.is_ai_enhanced
+                status_class = "online" if is_online else "offline"
+                status_text = "Online (Gemini AI)" if is_online else "Offline Rule-Based Mode"
+                st.markdown(
+                    f"""
+                    <div class="ecobot-panel-header">
+                        <div class="ecobot-panel-title">🤖 Eco-Bot Assistant</div>
+                        <div class="ecobot-status">
+                            <span class="ecobot-status-dot {status_class}"></span>
+                            <span>{escape(status_text)}</span>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+                with st.container(height=270, border=False, key="ecobot_history", autoscroll=True):
+                    if not st.session_state.chat_history:
+                        st.caption("Ask about recycling, waste disposal, or assignment objectives.")
+                    for chat in st.session_state.chat_history:
+                        role = chat.get("role", "assistant")
+                        content = chat.get("content", chat.get("text", ""))
+                        with st.chat_message(role):
+                            st.markdown(content)
+
+                with st.form("ecobot_chat_form", clear_on_submit=True):
+                    input_col, send_col = st.columns([1, 0.28], vertical_alignment="bottom")
+                    user_msg = input_col.text_input(
+                        "Type message",
+                        placeholder="Type message...",
+                        label_visibility="collapsed",
+                        key="ecobot_user_input",
+                    )
+                    submitted = send_col.form_submit_button("Send", use_container_width=True)
+
+                if submitted and user_msg.strip():
+                    st.session_state.chat_history.append(
+                        {"role": "user", "content": user_msg.strip()}
+                    )
+                    with st.spinner("Eco-Bot typing..."):
+                        reply = st.session_state.chatbot.get_response(user_msg.strip())
+                        if not st.session_state.chatbot.is_ai_enhanced:
+                            st.session_state.gemini_active = False
+                    st.session_state.chat_history.append(
+                        {"role": "assistant", "content": reply}
+                    )
+                    st.rerun()
+
+                if st.session_state.chat_history:
+                    if st.button("Clear Chat History", key="ecobot_clear_chat"):
+                        st.session_state.chat_history = []
+                        st.rerun()
+
+        if st.button("🤖 Eco-Bot", key="ecobot_toggle"):
+            st.session_state.ecobot_open = not st.session_state.ecobot_open
+            st.rerun()
 
 
 
@@ -167,6 +371,7 @@ def load_classification_model():
 
 
 model = load_classification_model()
+render_ecobot_widget()
 
 if not TF_AVAILABLE or model is None:
     st.sidebar.warning(
@@ -558,61 +763,7 @@ if app_view == "📸 Prediction Workspace":
             st.pyplot(fig)
             plt.close(fig)
 
-        # ── Row 2 (full width): 🤖 Eco-Bot Assistant ──
-        st.markdown("---")
-        st.markdown("## 🤖 Eco-Bot Assistant")
-        st.caption("Ask anything about recycling, waste disposal, or assignment objectives.")
-
-        # Initialize chatbot instance
-        if "chatbot" not in st.session_state:
-            st.session_state.chatbot = chatbot.create_chatbot()
-
-        # Sync Gemini active state
-        if not st.session_state.get("gemini_active", True):
-            st.session_state.chatbot.gemini_available = False
-
-        # Chat history state
-        if "chat_history" not in st.session_state:
-            st.session_state.chat_history = []
-
-        # Display status
-        if st.session_state.chatbot.is_ai_enhanced:
-            st.success("🟢 Eco-Bot Status: Online (Enhanced with Gemini AI API)", icon="🤖")
-        else:
-            st.info("⚪ Eco-Bot Status: Online (Offline Rule-Based Mode active). Provide GEMINI_API_KEY environment variable to unfreeze capacity.", icon="⚙️")
-
-        # Display history
-        for chat in st.session_state.chat_history:
-            with st.chat_message(chat["role"]):
-                st.markdown(chat["content"])
-
-        # Handle Input
-        user_msg = st.chat_input("Enter waste management query...", key="workspace_chat_input")
-        if user_msg:
-            # Append User Msg
-            st.session_state.chat_history.append({"role": "user", "content": user_msg})
-            with st.chat_message("user"):
-                st.markdown(user_msg)
-
-            # Get response
-            with st.spinner("Eco-Bot typing..."):
-                reply = st.session_state.chatbot.get_response(user_msg)
-                # Sync back if the chatbot disabled Gemini
-                if not st.session_state.chatbot.is_ai_enhanced:
-                    st.session_state.gemini_active = False
-
-            # Append bot reply
-            st.session_state.chat_history.append({"role": "assistant", "content": reply})
-            with st.chat_message("assistant"):
-                st.markdown(reply)
-                
-        # Clear history button
-        if len(st.session_state.chat_history) > 0:
-            if st.button("🧹 Clear Chat History", key="workspace_clear_chat"):
-                st.session_state.chat_history = []
-                st.rerun()
-
-        # Row 3 (full width): XAI Explainability Visualizations
+        # Row 2 (full width): XAI Explainability Visualizations
         st.markdown("---")
         method_title = "Score-CAM" if xai_method.startswith("Score-CAM") else "Grad-CAM++"
         st.markdown(f"## 🔬 Explainable AI — {method_title} Visualizations")
@@ -922,6 +1073,3 @@ elif app_view == "📊 Analytics Dashboard":
             st.image(best_cm_cnn, caption="Custom CNN Confusion Matrix", use_container_width=True)
         else:
             st.info("No saved model confusion matrices detected. Execute train.py to generate matrices.")
-
-
-
