@@ -42,6 +42,11 @@ MODEL_DIR = os.path.join(PROJECT_DIR, "model")
 MODEL_PATH = os.path.join(MODEL_DIR, "waste_model.h5")
 FRONTEND_DIR = os.path.join(PROJECT_DIR, "frontend")
 
+import sys
+if PROJECT_DIR not in sys.path:
+    sys.path.append(PROJECT_DIR)
+import chatbot
+
 # Image settings
 IMG_SIZE = (224, 224)
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "bmp", "gif"}
@@ -160,6 +165,14 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__, static_folder=FRONTEND_DIR, static_url_path="")
 app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
 CORS(app)
+
+# Initialize chatbot
+try:
+    chatbot_instance = chatbot.create_chatbot()
+    logger.info("✅ Chatbot engine initialized successfully!")
+except Exception as e:
+    logger.error(f"❌ Failed to initialize chatbot engine: {e}")
+    chatbot_instance = None
 
 # ═══════════════════════════════════════════════════════════════════
 # MODEL LOADING
@@ -431,6 +444,31 @@ def get_classes():
             "recommendations": RECYCLING_RECOMMENDATIONS,
         }
     )
+
+
+@app.route("/chat", methods=["POST"])
+def chat():
+    """
+    POST /chat
+    ──────────
+    Processes a chat message using the chatbot module.
+    """
+    if chatbot_instance is None:
+        return jsonify({"success": False, "error": "Chatbot service is not available."}), 500
+
+    data = request.get_json() or {}
+    user_message = data.get("message", "").strip()
+
+    try:
+        reply = chatbot_instance.get_response(user_message)
+        return jsonify({
+            "success": True,
+            "response": reply,
+            "is_ai_enhanced": chatbot_instance.is_ai_enhanced
+        }), 200
+    except Exception as e:
+        logger.error(f"Chatbot error: {e}")
+        return jsonify({"success": False, "error": "Failed to process chat message."}), 500
 
 
 # ═══════════════════════════════════════════════════════════════════

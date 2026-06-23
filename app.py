@@ -279,22 +279,35 @@ def render_ecobot_widget():
                 is_online = st.session_state.chatbot.is_ai_enhanced
                 status_class = "online" if is_online else "offline"
                 status_text = "Online (Gemini AI)" if is_online else "Offline Rule-Based Mode"
-                st.markdown(
-                    f"""
-                    <div class="ecobot-panel-header">
-                        <div class="ecobot-panel-title">🤖 Eco-Bot Assistant</div>
-                        <div class="ecobot-status">
-                            <span class="ecobot-status-dot {status_class}"></span>
-                            <span>{escape(status_text)}</span>
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
 
+                # Use columns to place the header content and the close button
+                header_main_col, close_btn_col = st.columns([1, 0.15])
+
+                with header_main_col:
+                    # Header with title and status
+                    # The ecobot-panel-header class is now primarily for text styling within the column
+                    st.markdown(
+                        f"""
+                        <div class="ecobot-panel-header">
+                            <div class="ecobot-panel-title">🤖 Eco-Bot Assistant</div>
+                            <div class="ecobot-status">
+                                <span class="ecobot-status-dot {status_class}"></span>
+                                <span>{escape(status_text)}</span>
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                with close_btn_col:
+                    # Close button
+                    if st.button("✕", key="ecobot_close_button", help="Close Eco-Bot"):
+                        st.session_state.ecobot_open = False
+                        st.rerun()
+
+                # Chat history container
                 with st.container(height=270, border=False, key="ecobot_history", autoscroll=True):
                     if not st.session_state.chat_history:
-                        st.caption("Ask about recycling, waste disposal, or assignment objectives.")
+                        st.caption("👋 Hello! I'm EcoBot. Ask me anything about waste classification, recycling recommendations, sustainability, or waste management.")
                     for chat in st.session_state.chat_history:
                         role = chat.get("role", "assistant")
                         content = chat.get("content", chat.get("text", ""))

@@ -260,6 +260,48 @@
     <span id="toast-text">Action completed</span>
   </div>
 
+  <!-- ═══ EcoBot Floating Chat Widget ═══ -->
+  <div class="ecobot-widget" id="ecobot-widget">
+    <!-- Floating Launcher Button -->
+    <button class="ecobot-launcher" id="ecobot-launcher" aria-label="Open EcoBot Chat">
+      <span class="launcher-icon">🤖</span>
+      <span class="launcher-text">Ask EcoBot</span>
+    </button>
+
+    <!-- Chat Popup Window -->
+    <div class="ecobot-popup" id="ecobot-popup" aria-hidden="true" role="dialog" aria-label="EcoBot Chat Assistant">
+      <div class="ecobot-header">
+        <div class="ecobot-header-info">
+          <div class="ecobot-avatar">🤖</div>
+          <div>
+            <div class="ecobot-title">EcoBot Assistant</div>
+            <div class="ecobot-status">
+              <span class="ecobot-status-dot online"></span>
+              <span id="ecobot-status-text">Online</span>
+            </div>
+          </div>
+        </div>
+        <button class="ecobot-close" id="ecobot-close" aria-label="Close Chat">✕</button>
+      </div>
+
+      <!-- Messages Area -->
+      <div class="ecobot-messages" id="ecobot-messages">
+        <!-- Messages will be populated dynamically -->
+      </div>
+
+      <!-- Input Form -->
+      <form class="ecobot-input-area" id="ecobot-form">
+        <input type="text" id="ecobot-input" placeholder="Ask a question..." autocomplete="off" aria-label="Type your message">
+        <button type="submit" class="ecobot-send-btn" aria-label="Send message">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </form>
+    </div>
+  </div>
+
   <!-- TensorFlow.js & MobileNet (from CDN) -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js"></script>
