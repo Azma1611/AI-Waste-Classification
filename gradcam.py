@@ -36,9 +36,9 @@ except ImportError:
 def find_target_explain_layer(model) -> str:
     """
     Finds the target convolutional or activation layer to use for Grad-CAM.
-    For MobileNetV2: targets 'block_13_expand_relu' (14x14x576) for 4x resolution.
-    For ResNet50: targets 'conv4_block6_out' (14x14x1024).
-    Otherwise falls back to the final convolutional layer.
+    Prioritizes the final convolutional/activation layer of the backbone (e.g. out_relu
+    for MobileNetV2, conv5_block3_out for ResNet50) to capture holistic, semantic object
+    information, which is then refined to pixel-sharp boundaries using the Guided Filter.
 
     Parameters
     ----------
@@ -61,8 +61,8 @@ def find_target_explain_layer(model) -> str:
     if base_model is not None:
         model_name_lower = base_model.name.lower()
         if "mobilenet" in model_name_lower:
-            # MobileNetV2 high-res target layer (14x14x576)
-            target_layers = ["block_13_expand_relu", "block_13_expand"]
+            # MobileNetV2 final semantic activation layer (7x7x1280) for holistic object focus
+            target_layers = ["out_relu", "Conv_1", "block_16_project"]
             for name in target_layers:
                 try:
                     base_model.get_layer(name)
@@ -70,8 +70,8 @@ def find_target_explain_layer(model) -> str:
                 except ValueError:
                     continue
         elif "resnet" in model_name_lower:
-            # ResNet50 high-res target layer (14x14x1024)
-            target_layers = ["conv4_block6_out", "conv4_block6_3_conv"]
+            # ResNet50 final semantic block activation layer (7x7x2048)
+            target_layers = ["conv5_block3_out", "conv5_block3_3_conv", "conv5_block3_add"]
             for name in target_layers:
                 try:
                     base_model.get_layer(name)
@@ -91,12 +91,10 @@ def find_target_explain_layer(model) -> str:
 
     # Fallback to known names
     known_final_layers = [
-        "conv5_block3_3_conv",
         "conv5_block3_out",
         "out_relu",
-        "block_16_project",
-        "block_13_expand_relu",
-        "conv4_block6_out"
+        "conv5_block3_3_conv",
+        "block_16_project"
     ]
     for name in known_final_layers:
         try:
@@ -140,7 +138,7 @@ def _get_nested_layer(model, layer_name):
 # GUIDED IMAGE FILTERING
 # ══════════════════════════════════════════════════════════════════════════════
 
-def guided_filter(guidance: np.ndarray, target: np.ndarray, r: int = 8, eps: float = 1e-3) -> np.ndarray:
+def guided_filter(guidance: np.ndarray, target: np.ndarray, r: int = 12, eps: float = 1e-3) -> np.ndarray:
     """
     Guided image filter for edge-preserving smoothing and detail transfer.
     Aligns the boundaries of the heatmap with the edges of the guidance image.
@@ -152,7 +150,7 @@ def guided_filter(guidance: np.ndarray, target: np.ndarray, r: int = 8, eps: flo
     target : np.ndarray
         Heatmap of shape (H, W), values in range [0, 1].
     r : int
-        Local window radius.
+        Local window radius. Default r=12 for smooth, holistic boundary alignment.
     eps : float
         Regularization parameter (variance threshold).
         
@@ -207,8 +205,8 @@ def generate_gradcam_heatmap(
     target_class_idx: int = None,
     conv_layer_name: str = None,
     use_gradcam_plusplus: bool = True,
-    threshold: float = 0.20,
-    gamma: float = 1.5,
+    threshold: float = 0.05,
+    gamma: float = 0.8,
 ) -> np.ndarray:
     """
     Generate a highly localized Grad-CAM or Grad-CAM++ heatmap for a given image and model.
@@ -230,8 +228,10 @@ def generate_gradcam_heatmap(
         If True, applies Grad-CAM++ using first, second, and third-order derivatives.
     threshold : float
         Soft threshold value (0.0 to 1.0) to remove background activation noise.
+        Default threshold=0.05 to keep weaker activations over object bodies.
     gamma : float
         Gamma exponent for contrast enhancement and peak focusing.
+        Default gamma=0.8 to spread highlights across full object body.
 
     Returns
     -------
@@ -240,14 +240,14 @@ def generate_gradcam_heatmap(
     """
     if not TF_AVAILABLE or model is None:
         # Return a placeholder heatmap
-        return np.random.rand(14, 14).astype(np.float32)
+        return np.random.rand(7, 7).astype(np.float32)
 
     # Find the target convolutional layer
     if conv_layer_name is None:
         conv_layer_name = find_target_explain_layer(model)
         if conv_layer_name is None:
             print("[Grad-CAM Diagnostic] Error: No suitable conv layer found!")
-            return np.ones((14, 14), dtype=np.float32) * 0.5
+            return np.ones((7, 7), dtype=np.float32) * 0.5
 
     # Check if we have a nested base model (e.g. resnet50, mobilenetv2)
     base_model = None
@@ -335,7 +335,7 @@ def generate_gradcam_heatmap(
 
         if grads_first is None:
             print("[Grad-CAM Diagnostic] Error: Gradients are None!")
-            return np.ones((14, 14), dtype=np.float32) * 0.5
+            return np.ones((7, 7), dtype=np.float32) * 0.5
 
         # Weight the conv outputs
         conv_outputs_val = conv_outputs[0]
@@ -399,7 +399,7 @@ def overlay_heatmap_on_image(
     alpha: float = 0.50,
     colormap: int = cv2.COLORMAP_JET,
     target_size: tuple = (224, 224),
-    r: int = 8,
+    r: int = 12,
     eps: float = 1e-3,
 ) -> np.ndarray:
     """
@@ -419,7 +419,7 @@ def overlay_heatmap_on_image(
     target_size : tuple
         Output image size (width, height).
     r : int
-        Guided filter window radius.
+        Guided filter window radius. Default r=12.
     eps : float
         Guided filter regularization epsilon.
 
@@ -651,7 +651,7 @@ def explain_prediction(
     print(f"[Grad-CAM Diagnostic] Predicted Class: {pred_class}")
     print(f"[Grad-CAM Diagnostic] Confidence: {confidence:.4f}")
     print(f"[Grad-CAM Diagnostic] Selected Grad-CAM Layer: {conv_layer_name}")
-    print(f"[Grad-CAM Diagnostic] Heatmap Min/Max: {heatmap.min():.4f}/{heatmap.max():.4f}")
+    print(f"[Grad-CAM Diagnostic] Heatmap Min/Max: {heatmap.min():.6f}/{heatmap.max():.6f}")
 
     # Create overlay (using alpha=0.5 for optimal visual pop and edge alignment)
     overlay = overlay_heatmap_on_image(pil_image, heatmap, alpha=0.5)
