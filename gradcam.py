@@ -293,22 +293,30 @@ def generate_gradcam_heatmap(
                 if found_base:
                     head_layers.append(layer)
             
-            def run_head(x):
-                for hl in head_layers:
-                    x = hl(x)
-                return x
+            dense_classifier = head_layers[-1]
+            head_layers_except_last = head_layers[:-1]
 
-            # Grad-CAM++ calculation using triple-nested tapes
+            def run_head_logits(x):
+                for hl in head_layers_except_last:
+                    x = hl(x)
+                if hasattr(dense_classifier, "kernel"):
+                    logits = tf.matmul(x, dense_classifier.kernel)
+                    if dense_classifier.use_bias:
+                        logits = logits + dense_classifier.bias
+                    return logits
+                else:
+                    return dense_classifier(x)
+
+            # Grad-CAM++ calculation using triple-nested tapes w.r.t pre-softmax logits
             with tf.GradientTape() as tape3:
                 with tf.GradientTape() as tape2:
                     with tf.GradientTape() as tape1:
                         conv_outputs, base_features = base_grad_model(x_prep)
-                        predictions = run_head(base_features)
+                        logits = run_head_logits(base_features)
                         
                         if target_class_idx is None:
-                            target_class_idx = tf.argmax(predictions[0]).numpy()
-                        # Use log-probability to avoid softmax saturation and enable non-zero 2nd/3rd derivatives
-                        loss = tf.math.log(predictions[:, target_class_idx] + 1e-8)
+                            target_class_idx = tf.argmax(logits[0]).numpy()
+                        loss = logits[:, target_class_idx]
                         
                     grads_first = tape1.gradient(loss, conv_outputs)
                 grads_second = tape2.gradient(grads_first, conv_outputs)
@@ -317,18 +325,29 @@ def generate_gradcam_heatmap(
         else:
             # Standard flat model execution
             target_layer = _get_nested_layer(model, conv_layer_name)
-            grad_model = tf.keras.Model(
+            dense_classifier = model.layers[-1]
+            second_to_last_layer = model.layers[-2]
+
+            flat_grad_model = tf.keras.Model(
                 inputs=model.input,
-                outputs=[target_layer.output, model.output]
+                outputs=[target_layer.output, second_to_last_layer.output]
             )
+            
             with tf.GradientTape() as tape3:
                 with tf.GradientTape() as tape2:
                     with tf.GradientTape() as tape1:
-                        conv_outputs, predictions = grad_model(img_tensor)
+                        conv_outputs, pre_classifier_features = flat_grad_model(img_tensor)
+                        if hasattr(dense_classifier, "kernel"):
+                            logits = tf.matmul(pre_classifier_features, dense_classifier.kernel)
+                            if dense_classifier.use_bias:
+                                logits = logits + dense_classifier.bias
+                        else:
+                            logits = dense_classifier(pre_classifier_features)
+                            
                         if target_class_idx is None:
-                            target_class_idx = tf.argmax(predictions[0]).numpy()
-                        # Use log-probability to avoid softmax saturation and enable non-zero 2nd/3rd derivatives
-                        loss = tf.math.log(predictions[:, target_class_idx] + 1e-8)
+                            target_class_idx = tf.argmax(logits[0]).numpy()
+                        loss = logits[:, target_class_idx]
+                        
                     grads_first = tape1.gradient(loss, conv_outputs)
                 grads_second = tape2.gradient(grads_first, conv_outputs)
             grads_third = tape3.gradient(grads_second, conv_outputs)
