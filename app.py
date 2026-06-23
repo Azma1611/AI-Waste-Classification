@@ -127,16 +127,35 @@ st.markdown("""
         object-fit: contain !important;
         border-radius: 8px;
     }
-    .st-key-ecobot_widget_root {
-        position: fixed;
-        bottom: 1.25rem;
-        right: 1.25rem;
-        z-index: 999999;
-        width: min(390px, calc(100vw - 2rem));
-        pointer-events: none;
+    /* Disable transform, will-change, and overflow clipping on all ancestors of the widget */
+    div[data-testid="stVerticalBlock"]:has(.st-key-ecobot_toggle),
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-ecobot_toggle),
+    div[data-testid="stElementContainer"]:has(.st-key-ecobot_toggle),
+    div[data-testid="stVerticalBlock"]:has(.st-key-ecobot_panel),
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-ecobot_panel),
+    div[data-testid="stElementContainer"]:has(.st-key-ecobot_panel) {
+        transform: none !important;
+        will-change: auto !important;
+        overflow: visible !important;
     }
-    .st-key-ecobot_widget_root * {
-        pointer-events: auto;
+
+    /* PERSISTENT FLOATING VIEWPORT POSITIONING FOR ECOBOT COMPONENTS */
+    div[data-testid="stElementContainer"]:has(.st-key-ecobot_toggle),
+    .st-key-ecobot_toggle {
+        position: fixed !important;
+        bottom: 24px !important;
+        right: 24px !important;
+        z-index: 999999 !important;
+        width: auto !important;
+    }
+    
+    div[data-testid="stElementContainer"]:has(.st-key-ecobot_panel),
+    .st-key-ecobot_panel {
+        position: fixed !important;
+        bottom: 85px !important;
+        right: 24px !important;
+        z-index: 999999 !important;
+        width: min(390px, calc(100vw - 2rem)) !important;
     }
     .st-key-ecobot_panel {
         max-height: min(72vh, 620px);
