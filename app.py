@@ -234,15 +234,15 @@ st.markdown("""
         min-width: 142px;
         min-height: 3rem;
         border-radius: 999px;
-        border: 1px solid rgba(139, 92, 246, 0.7);
-        background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+        border: 1px solid rgba(16, 185, 129, 0.7);
+        background: linear-gradient(135deg, #10b981, #059669);
         color: #ffffff;
         font-weight: 800;
-        box-shadow: 0 12px 30px rgba(109, 40, 217, 0.25);
+        box-shadow: 0 12px 30px rgba(16, 185, 129, 0.25);
     }
     .st-key-ecobot_toggle button:hover {
-        border-color: #a78bfa;
-        box-shadow: 0 16px 34px rgba(139, 92, 246, 0.28);
+        border-color: #34d399;
+        box-shadow: 0 16px 34px rgba(16, 185, 129, 0.35);
         transform: translateY(-1px);
     }
     @keyframes ecobot-open {
