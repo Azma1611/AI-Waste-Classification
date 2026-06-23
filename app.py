@@ -442,6 +442,11 @@ if app_view == "📸 Prediction Workspace":
 
     # Display results if they exist for the current file
     if uploaded_file and st.session_state.uploaded_file_name == uploaded_file.name:
+        # Recreate img_batch to ensure it is defined on Streamlit reruns
+        img_resized = pil_img.resize((224, 224))
+        img_array = np.array(img_resized, dtype=np.float32) / 255.0
+        img_batch = np.expand_dims(img_array, axis=0)
+
         predictions = st.session_state.predictions
         pred_class = st.session_state.pred_class
         confidence = st.session_state.confidence
