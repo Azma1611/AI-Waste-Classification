@@ -31,17 +31,23 @@ def get_gradcam_overlay(image_path, target_class_name="Glass"):
     img_array = np.array(img_resized, dtype=np.float32) / 255.0
     img_batch = np.expand_dims(img_array, axis=0)
     
-    # Find layer and generate Grad-CAM++ heatmap
+    # Find layer and generate Score-CAM heatmap
     conv_layer_name = gradcam.find_target_explain_layer(model)
     print(f"Targeting layer for explanation: {conv_layer_name}")
     
-    heatmap = gradcam.generate_gradcam_heatmap(
+    import time
+    start_time = time.time()
+    k_channels = 64
+    heatmap = gradcam.generate_scorecam_heatmap(
         model,
         img_batch,
         target_class_idx=target_idx,
         conv_layer_name=conv_layer_name,
-        use_gradcam_plusplus=True
+        k_channels=k_channels
     )
+    latency = time.time() - start_time
+    print(f"[Score-CAM Performance] Channels selected: {k_channels}")
+    print(f"[Score-CAM Performance] Heatmap generation latency: {latency:.4f} seconds")
     
     # 3. Generate visual overlay with Guided Image Filtering (Research-Quality)
     superimposed = gradcam.overlay_heatmap_on_image(img_resized, heatmap, alpha=0.5)
@@ -50,9 +56,9 @@ def get_gradcam_overlay(image_path, target_class_name="Glass"):
     os.makedirs("scratch", exist_ok=True)
     out_path = "scratch/gradcam_waste_diagnostic.png"
     
-    # Convert RGB to BGR for cv2 writing
+    # Convert RGB to BGR for cv2 saving
     cv2.imwrite(out_path, cv2.cvtColor(superimposed, cv2.COLOR_RGB2BGR))
-    print(f"Saved research-quality diagnostic overlay directly to: {out_path}")
+    print(f"Saved research-quality Score-CAM overlay directly to: {out_path}")
 
 if __name__ == "__main__":
     import sys
