@@ -97,7 +97,7 @@ st.markdown("""
     [data-testid="stImage"] img {
         max-height: 350px !important;
         object-fit: contain !important;
-        border-radius: 8px;
+        border-radius: 8px !important;
     }
     .st-key-ecobot_widget_root {
         position: static !important;
@@ -395,6 +395,11 @@ def build_and_compile_assignment_model():
 
 
 model, base_backbone = build_and_compile_assignment_model()
+
+# Ensure app_mode is present in session_state before rendering EcoBot so that toggles don't reset the view
+if "app_mode" not in st.session_state:
+    st.session_state["app_mode"] = "📊 System Setup & EDA"
+
 render_ecobot_widget()
 
 # ==============================================================================
@@ -453,14 +458,11 @@ with st.sidebar:
     )
     st.markdown("---")
 
-    # Persist the app mode selection in session_state so it is preserved across reruns
-    if "app_mode" not in st.session_state:
-        st.session_state["app_mode"] = "📊 System Setup & EDA"
-
+    # Render radio bound to session_state so selection persists across reruns
     app_mode = st.radio(
         "Switch Dashboard View:",
         ["📊 System Setup & EDA", "📸 Live Classification Workspace"],
-        key="app_mode"
+        key="app_mode",
     )
 
     st.markdown("---")
@@ -484,7 +486,6 @@ with st.sidebar:
     else:
         xai_method = "Score-CAM (Gradient-Free)"
         k_channels = 64
-
 
 
 
