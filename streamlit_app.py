@@ -128,7 +128,7 @@ st.markdown("""
     div[data-testid="stElementContainer"]:has(.st-key-ecobot_toggle),
     .st-key-ecobot_toggle {
         position: fixed !important;
-        bottom: 24px !important;
+        bottom: 80px !important;
         right: 24px !important;
         z-index: 999999 !important;
         width: auto !important;
@@ -137,7 +137,7 @@ st.markdown("""
     div[data-testid="stElementContainer"]:has(.st-key-ecobot_panel),
     .st-key-ecobot_panel {
         position: fixed !important;
-        bottom: 85px !important;
+        bottom: 140px !important;
         right: 24px !important;
         z-index: 999999 !important;
         width: min(390px, calc(100vw - 2rem)) !important;
