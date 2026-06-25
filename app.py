@@ -952,7 +952,7 @@ elif app_view == "📊 Analytics Dashboard":
 
     with tab_eda:
         st.subheader("Exploratory Data Analysis (EDA)")
-        st.write("View visual metrics generated from the 11,522 images in our preprocessed dataset split.")
+        st.write("View visual metrics generated from the 10,472 images in our preprocessed dataset split.")
 
         c1, c2 = st.columns(2)
         
@@ -1011,11 +1011,11 @@ elif app_view == "📊 Analytics Dashboard":
             # Show representative benchmarks
             df_mock = pd.DataFrame({
                 "Model": ["Custom CNN", "MobileNetV2 Transfer", "ResNet50 Transfer"],
-                "Accuracy": [0.784, 0.912, 0.941],
-                "Precision": [0.771, 0.908, 0.942],
-                "Recall": [0.784, 0.912, 0.941],
-                "F1-Score": [0.774, 0.910, 0.941],
-                "Training Time (Min)": [18.5, 45.2, 58.7]
+                "Accuracy": [0.094, 0.858, 0.874],
+                "Precision": [0.009, 0.861, 0.876],
+                "Recall": [0.094, 0.858, 0.874],
+                "F1-Score": [0.016, 0.858, 0.875],
+                "Training Time (Min)": [79.8, 77.5, 232.4]
             })
             st.dataframe(df_mock, use_container_width=True, hide_index=True)
             

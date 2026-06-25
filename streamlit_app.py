@@ -529,8 +529,8 @@ if app_mode == "📊 System Setup & EDA":
     st.title("📊 Dataset Analytics & Model Metrics Evaluation Engine")
     st.write("Review dataset distribution, EDA charts, and deep learning model benchmarks.")
 
-    # Representative dataset distribution (15,220 images across 6 classes)
-    mock_counts = [2620, 2480, 2350, 2290, 2960, 2520]
+    # Representative dataset distribution (10,472 images across 6 classes)
+    mock_counts = [1568, 1612, 1048, 1482, 885, 3877]
     df_eda = pd.DataFrame({"Category": classes, "Image Count": mock_counts})
 
     tab1, tab2, tab3 = st.tabs([
@@ -541,7 +541,7 @@ if app_mode == "📊 System Setup & EDA":
 
     # ── Tab 1: EDA Charts ──────────────────────────────────────────────────────
     with tab1:
-        st.subheader("EDA Plots — Target Image Volume: 15,220 Items")
+        st.subheader("EDA Plots — Target Image Volume: 10,472 Items")
         c1, c2 = st.columns(2)
 
         with c1:
@@ -605,10 +605,10 @@ if app_mode == "📊 System Setup & EDA":
         else:
             df_models = pd.DataFrame({
                 "Model":     ["Custom CNN", "MobileNetV2 (Fine-Tuned)", "ResNet50"],
-                "Accuracy":  [0.764,        0.892,                       0.938],
-                "Precision": [0.750,        0.887,                       0.940],
-                "Recall":    [0.761,        0.881,                       0.935],
-                "F1-Score":  [0.755,        0.884,                       0.937],
+                "Accuracy":  [0.094,        0.858,                       0.874],
+                "Precision": [0.009,        0.861,                       0.876],
+                "Recall":    [0.094,        0.858,                       0.874],
+                "F1-Score":  [0.016,        0.858,                       0.875],
             })
             st.info("📋 Showing representative benchmarks. Run `train_engine.py` to populate live results.")
 

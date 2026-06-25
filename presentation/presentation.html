@@ -362,9 +362,10 @@
                     </div>
                     <div class="highlight-box">
                         <h3>Volume Totals</h3>
-                        <p style="margin-top: 5px;">Total Raw Images: <strong>11,522 items</strong></p>
-                        <p>Train Split: <strong>9,214 images (80%)</strong></p>
-                        <p>Val/Test Splits: <strong>10% / 10%</strong></p>
+                        <p style="margin-top: 5px;">Total Preprocessed Images: <strong>10,472 items</strong></p>
+                        <p>Train Split: <strong>8,377 images (80%)</strong></p>
+                        <p>Val Split: <strong>1,047 images (10%)</strong></p>
+                        <p>Test Split: <strong>1,048 images (10%)</strong></p>
                     </div>
                 </div>
             </div>
@@ -474,7 +475,7 @@
                 <h2>Performance Benchmarks (Module 7)</h2>
             </div>
             <div class="slide-content">
-                <p>Metrics computed on the held-out test split (1,156 images):</p>
+                <p>Metrics computed on the held-out test split (1,048 images):</p>
                 <table>
                     <thead>
                         <tr>
@@ -488,24 +489,24 @@
                     <tbody>
                         <tr>
                             <td>Custom CNN</td>
-                            <td>78.4%</td>
-                            <td>0.771</td>
-                            <td>0.784</td>
-                            <td>0.774</td>
+                            <td>9.4%</td>
+                            <td>0.009</td>
+                            <td>0.094</td>
+                            <td>0.016</td>
                         </tr>
                         <tr>
                             <td>MobileNetV2 Transfer</td>
-                            <td>91.2%</td>
-                            <td>0.908</td>
-                            <td>0.912</td>
-                            <td>0.910</td>
+                            <td>85.8%</td>
+                            <td>0.861</td>
+                            <td>0.858</td>
+                            <td>0.858</td>
                         </tr>
                         <tr style="background-color: rgba(16, 185, 129, 0.15);">
                             <td><strong>ResNet50 Transfer (Winner)</strong></td>
-                            <td><strong>94.1%</strong></td>
-                            <td><strong>0.942</strong></td>
-                            <td><strong>0.941</strong></td>
-                            <td><strong>0.941</strong></td>
+                            <td><strong>87.4%</strong></td>
+                            <td><strong>0.876</strong></td>
+                            <td><strong>0.874</strong></td>
+                            <td><strong>0.875</strong></td>
                         </tr>
                     </tbody>
                 </table>
@@ -625,7 +626,7 @@
             <div class="slide-content">
                 <p style="margin-bottom: 15px;">The project successfully delivers a highly verified deep learning waste management solution:</p>
                 <ul>
-                    <li><strong>High Accuracy Achieved</strong>: ResNet50 achieves <strong>94.1% accuracy</strong>.</li>
+                    <li><strong>High Accuracy Achieved</strong>: ResNet50 achieves <strong>87.4% accuracy</strong>.</li>
                     <li><strong>XAI Integration</strong>: Built-in Grad-CAM maps resolve "black box" model transparency issues.</li>
                     <li><strong>End-to-End Delivery</strong>: The platform integrates classification, recommendation lookup, carbon scoring, and interactive support.</li>
                     <li><strong>Future Directions</strong>: Incorporate multi-object detection (e.g., YOLOv8) to classify grouped waste items simultaneously.</li>

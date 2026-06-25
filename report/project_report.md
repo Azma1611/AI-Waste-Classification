@@ -10,7 +10,7 @@
 ## 1. Abstract
 Improper waste management represents a critical environmental, social, and economic crisis globally. Municipalities struggle with high contamination rates in recycling bins, while landfills overflow with materials that could otherwise be recovered. To address this bottleneck, we present **EcoScan AI**, a complete end-to-end framework that uses deep learning to identify, classify, and recommend disposal options for waste items. We map a complex 9-category dataset into 6 official target classes: Plastic, Paper, Glass, Metal, Organic Waste, and E-Waste. 
 
-We evaluate three deep learning architectures: a custom multi-layer convolutional neural network (Custom CNN), a fine-tuned MobileNetV2 transfer learning model, and a fine-tuned ResNet50 transfer learning model. On-the-fly data augmentation and MD5-based exact duplicate elimination are integrated to ensure high dataset quality and eliminate data leakage. The winning architecture, ResNet50, achieves a validation accuracy of **94.1%**, significantly exceeding our target threshold. 
+We evaluate three deep learning architectures: a custom multi-layer convolutional neural network (Custom CNN), a fine-tuned MobileNetV2 transfer learning model, and a fine-tuned ResNet50 transfer learning model. On-the-fly data augmentation and MD5-based exact duplicate elimination are integrated to ensure high dataset quality and eliminate data leakage. The winning architecture, ResNet50, achieves a test accuracy of **87.4%**, which is close to our target threshold. 
 
 To ensure trust and interpretability in clinical and civic deployments, we implement **Gradient-weighted Class Activation Mapping (Grad-CAM)** to visualize the decision boundaries and activation hotspots of the models. Finally, we implement a production-ready, dark-themed Streamlit web application that provides real-time waste classification, automated recycling rules, environmental impact scores, an interactive AI Eco-Bot assistant, and a downloadable PDF diagnostics report.
 
@@ -60,10 +60,10 @@ To align with standard municipal classifications, we implement a strict folder m
 | `E-waste`, `automobile wastes`, `battery waste`, `light bulbs` | **E-Waste** | Electronic products, lead-acid batteries, and mercury bulbs. |
 
 ### Dataset Size Summary
-* **Train Split (80%)**: 9,214 images
-* **Validation Split (10%)**: 1,152 images
-* **Test Split (10%)**: 1,156 images
-* **Total Images**: 11,522 images
+* **Train Split (80%)**: 8,377 images
+* **Validation Split (10%)**: 1,047 images
+* **Test Split (10%)**: 1,048 images
+* **Total Images**: 10,472 images
 
 ---
 
@@ -130,14 +130,14 @@ The models were evaluated on the held-out test split (10%). ResNet50 emerged as 
 
 | Architecture | Accuracy | Precision (Weighted) | Recall (Weighted) | F1-Score (Weighted) | Training Time (Min) |
 |---|---|---|---|---|---|
-| **Custom CNN** | 78.4% | 0.771 | 0.784 | 0.774 | 18.5 min |
-| **MobileNetV2** | 91.2% | 0.908 | 0.912 | 0.910 | 45.2 min |
-| **ResNet50** | **94.1%** | **0.942** | **0.941** | **0.941** | 58.7 min |
+| **Custom CNN** | 9.4% | 0.009 | 0.094 | 0.016 | 79.8 min |
+| **MobileNetV2** | 85.8% | 0.861 | 0.858 | 0.858 | 77.5 min |
+| **ResNet50** | **87.4%** | **0.876** | **0.874** | **0.875** | 232.4 min |
 
 ### Key Observations
-* The Custom CNN performed reasonably well but was limited by capacity, struggling to identify E-waste components (e.g., printed circuit boards) due to shape variance.
-* MobileNetV2 achieved a high accuracy of 91.2%, proving its utility for resource-constrained environments.
-* ResNet50 achieved the highest overall metrics (94.1% accuracy), benefiting from deep residual blocks that capture complex texture features.
+* The Custom CNN struggled to train from scratch, failing to converge on features (achieving 9.4% accuracy, which is worse than a uniform random guess of 16.7%).
+* MobileNetV2 achieved a strong accuracy of 85.8%, proving its utility for resource-constrained environments.
+* ResNet50 achieved the highest overall metrics (87.4% accuracy), benefiting from deep residual blocks that capture complex texture features.
 
 Confusion matrices and training curve histories are saved in the `model/results/` folder for verification.
 
@@ -208,7 +208,7 @@ If plastic bottles are crushed or paper is heavily crumpled, the model's confide
 ---
 
 ## 16. Conclusion & References
-We have built and verified a complete, production-ready AI-Powered Waste Classification System. By combining state-of-the-art transfer learning (ResNet50 achieving **94.1%** accuracy) with Explainable AI (Grad-CAM), recycling recommendation models, and a downloadable PDF generator, we offer a robust civic solution to minimize recycling contamination.
+We have built and verified a complete, production-ready AI-Powered Waste Classification System. By combining state-of-the-art transfer learning (ResNet50 achieving **87.4%** accuracy) with Explainable AI (Grad-CAM), recycling recommendation models, and a downloadable PDF generator, we offer a robust civic solution to minimize recycling contamination.
 
 ### References
 1. Banzhal, M. et al. (2021). *Deep Learning for Automated Municipal Waste Classification*. Journal of Eco-Tech, 14(2), 112-120.
