@@ -306,7 +306,7 @@ def render_ecobot_widget():
                 with close_btn_col:
                     if st.button("✕", key="ecobot_close_button", help="Close Eco-Bot"):
                         st.session_state.ecobot_open = False
-                        # No st.rerun() here — Streamlit reruns automatically on button press
+                        st.rerun()
 
                 # Chat history container
                 with st.container(height=270, border=False, key="ecobot_history", autoscroll=True):
@@ -345,7 +345,6 @@ def render_ecobot_widget():
                             st.session_state.chat_history.append(
                                 {"role": "assistant", "content": full_response, "timestamp": ts_assistant}
                             )
-                            st.rerun()
 
                 with st.form("ecobot_chat_form", clear_on_submit=True):
                     input_col, send_col = st.columns([1, 0.28], vertical_alignment="bottom")
@@ -363,16 +362,16 @@ def render_ecobot_widget():
                     st.session_state.chat_history.append(
                         {"role": "user", "content": user_msg.strip(), "timestamp": ts_user}
                     )
-                    # No st.rerun() here — form submission triggers a rerun automatically
+                    st.rerun()
 
                 if st.session_state.chat_history:
                     if st.button("Clear Chat History", key="ecobot_clear_chat"):
                         st.session_state.chat_history = []
-                        # No st.rerun() here — button press triggers rerun automatically
+                        st.rerun()
 
         if st.button("🤖 Eco-Bot", key="ecobot_toggle"):
             st.session_state.ecobot_open = not st.session_state.ecobot_open
-            # No st.rerun() here — button press triggers rerun automatically
+            st.rerun()
 
 # Show cloud demo-mode notice when TF is not available
 if not TF_AVAILABLE:
@@ -522,8 +521,6 @@ with st.sidebar:
         xai_method = "Score-CAM (Gradient-Free)"
         k_channels = 64
 
-# Render EcoBot AFTER sidebar is created to avoid rerun/order races that can reset widgets
-render_ecobot_widget()
 
 # ==============================================================================
 # 6. VIEW 1: EDA, DATASET SETUP & MODEL PERFORMANCE
@@ -1078,4 +1075,9 @@ elif app_mode == "📸 Live Classification Workspace":
             f"⚠️ {impact} Impact  —  Score: {impact_score}/100</div>",
             unsafe_allow_html=True,
         )
+
+
+# Render EcoBot at the very end of the script to ensure all dashboard widget structures
+# are fully rendered and registered in Streamlit before any internal widget rerun triggers.
+render_ecobot_widget()
 

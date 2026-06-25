@@ -363,7 +363,6 @@ def render_ecobot_widget():
                             st.session_state.chat_history.append(
                                 {"role": "assistant", "content": full_response, "timestamp": ts_assistant}
                             )
-                            st.rerun()
 
                 with st.form("ecobot_chat_form", clear_on_submit=True):
                     input_col, send_col = st.columns([1, 0.28], vertical_alignment="bottom")
@@ -430,7 +429,6 @@ def load_classification_model():
 
 
 model = load_classification_model()
-render_ecobot_widget()
 
 if not TF_AVAILABLE or model is None:
     st.sidebar.warning(
@@ -1049,3 +1047,8 @@ elif app_view == "📊 Analytics Dashboard":
             st.image(best_cm_cnn, caption="Custom CNN Confusion Matrix", use_container_width=True)
         else:
             st.info("No saved model confusion matrices detected. Execute train.py to generate matrices.")
+
+
+# Render EcoBot at the very end of the script to ensure all dashboard widget structures
+# are fully rendered and registered in Streamlit before any internal widget rerun triggers.
+render_ecobot_widget()

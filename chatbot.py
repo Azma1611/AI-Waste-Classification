@@ -14,6 +14,7 @@ Project : AI-Powered Smart Waste Classification & Recycling System
 import re
 import random
 import os
+import time
 
 # ══════════════════════════════════════════════════════════════════════════════
 # KNOWLEDGE BASE — Rule-Based Responses
@@ -28,6 +29,7 @@ FAREWELL_PATTERNS = [
 ]
 
 # Category-specific knowledge base
+# Category-specific knowledge base
 WASTE_KNOWLEDGE = {
     "plastic": {
         "patterns": [
@@ -37,21 +39,24 @@ WASTE_KNOWLEDGE = {
         ],
         "responses": [
             (
-                "♻️ **Plastic Recycling Guide**\n\n"
-                "• Rinse containers before recycling\n"
-                "• Check the resin code (1-7) on the bottom\n"
-                "• PET (#1) and HDPE (#2) are most widely recyclable\n"
-                "• **Never** put plastic bags in curbside recycling — they jam machinery\n"
-                "• Plastic bottles can be recycled into polyester fiber for clothing\n\n"
-                "💡 **Tip:** Switch to reusable bottles and bags to reduce plastic waste by up to 90%!"
-            ),
-            (
-                "🌍 **Plastic Environmental Impact**\n\n"
-                "• Decomposition time: **450+ years**\n"
-                "• Only ~9% of plastic ever produced has been recycled\n"
-                "• 8 million tons of plastic enter oceans annually\n"
-                "• Microplastics have been found in drinking water, food, and human blood\n\n"
-                "♻️ **Action:** Reduce plastic usage first, reuse second, recycle last."
+                "### ♻️ Professional Plastic Recycling & Materials Science Guide\n\n"
+                "Plastic polymers represent a diverse class of synthetic organics, categorized by Resin Identification Codes (RIC) 1 through 7.\n\n"
+                "| Resin Code | Polymer Type | Common Applications | Recyclability | Circular Economy Value |\n"
+                "| :---: | :--- | :--- | :--- | :--- |\n"
+                "| **1** | PETE (Polyethylene Terephthalate) | Water bottles, soda cups | **High** | High (Fibers, sheet/film) |\n"
+                "| **2** | HDPE (High-Density Polyethylene) | Milk jugs, shampoo bottles | **High** | High (Pipes, decking, packaging) |\n"
+                "| **3** | PVC (Polyvinyl Chloride) | Pipes, vinyl siding, cable wire | **Low** | Critical/Toxic (Avoid landfill) |\n"
+                "| **4** | LDPE (Low-Density Polyethylene) | Squeeze bottles, shopping bags | **Moderate** | Medium (Plastic lumber) |\n"
+                "| **5** | PP (Polypropylene) | Yogurt tubs, bottle caps, straws | **Moderate** | High (Auto parts, industrial fibers) |\n"
+                "| **6** | PS (Polystyrene) | Plastic cups, styrofoam packaging | **Low** | Poor (Landfill/Thermal recovery) |\n"
+                "| **7** | Other (Polycarbonate, Acrylic, etc.) | Electronics, composite plastics | **Very Low** | Low (Upcycling only) |\n\n"
+                "#### 🔍 Disposal & Processing Instructions\n"
+                "1. **Decontamination:** Rinse container thoroughly. Residual sugar or organic matter degrades polymer purity during thermal reprocessing.\n"
+                "2. **Compaction:** Crush bottles to reduce volume, optimizing logistics and decreasing transportation carbon footprint.\n"
+                "3. **Segregation:** Keep films/bags separate. Flexible plastics wrap around mechanical sorting gears, causing system shutdowns.\n\n"
+                "#### 📊 Environmental Metrics & Energy Conservation\n"
+                "• **Carbon Footprint:** Manufacturing virgin PET emits ~1.89 kg CO₂ per kg of plastic. Using recycled PET (rPET) reduces this emissions factor by **70%**.\n"
+                "• **Energy Savings:** Recycling plastic saves approximately **5.77 Billion Joules (1.6 MWh)** of energy per ton compared to refining crude oil."
             ),
         ],
     },
@@ -62,13 +67,20 @@ WASTE_KNOWLEDGE = {
         ],
         "responses": [
             (
-                "📄 **Paper Recycling Guide**\n\n"
-                "• Keep paper clean and dry — grease/food ruins recyclability\n"
-                "• Flatten cardboard boxes before recycling\n"
-                "• Paper can be recycled up to **7 times** before fibers are too short\n"
-                "• Remove plastic windows from envelopes\n"
-                "• Pizza boxes with grease stains should be composted, not recycled\n\n"
-                "💡 **Tip:** Recycling 1 ton of paper saves 17 trees, 7,000 gallons of water!"
+                "### 📄 Professional Paper & Cellulose Fiber Recovery Guide\n\n"
+                "Paper recycling relies on recovering cellulose fibers from wood pulp. Moisture and organic contaminants are the primary challenges in paper recovery.\n\n"
+                "| Paper Class | Example Items | Processing Method | Fiber Quality | Recycle Limit |\n"
+                "| :--- | :--- | :--- | :--- | :--- |\n"
+                "| **Cardboard (OCC)** | Shipping boxes, package cartons | Pulping & de-inking | **Very High (Long fibers)** | Up to 7 times |\n"
+                "| **Mixed Paper** | Newspapers, junk mail, office print | Hydrapulping | **Medium (Shorter fibers)** | Up to 5 times |\n"
+                "| **Contaminated Paper** | Pizza boxes, greasy food wrappers | Composting (Organic bin) | **Unusable for paper** | 0 (Compost only) |\n\n"
+                "#### 🔍 Disposal & Processing Instructions\n"
+                "1. **Keep Dry:** Wet paper fibers weaken and degrade rapidly. Ensure paper products are shielded from moisture.\n"
+                "2. **Zero Grease:** Do not recycle paper contaminated with food grease. Grease prevents wood fibers from bonding during the pulping stage.\n"
+                "3. **Contaminant Removal:** Remove plastic window inserts from envelopes and steel staples if possible (though pulping filters catch some metal).\n\n"
+                "#### 📊 Environmental Metrics & Energy Conservation\n"
+                "• **Resource Preservation:** Recycling 1 metric ton of paper saves approximately **17 mature trees**, **26,500 liters (7,000 gallons) of water**, and 3 cubic yards of landfill space.\n"
+                "• **Energy Savings:** Paper recycling consumes **40% less energy** than producing paper from raw virgin wood pulp."
             ),
         ],
     },
@@ -79,13 +91,21 @@ WASTE_KNOWLEDGE = {
         ],
         "responses": [
             (
-                "🫙 **Glass Recycling Guide**\n\n"
-                "• Glass is **100% recyclable** with zero quality loss — infinitely!\n"
-                "• Rinse jars and bottles, remove metal caps\n"
-                "• Separate by color if required (clear, green, brown)\n"
-                "• Do NOT include ceramics, mirrors, or Pyrex (different melting points)\n"
-                "• Decomposition time if landfilled: **1 million years**\n\n"
-                "💡 **Tip:** Reuse glass jars for food storage before recycling."
+                "### 🫙 Professional Glass & Silica Recycling Guide\n\n"
+                "Glass is a non-crystalline, amorphous solid composed primarily of silica (SiO₂). It is a closed-loop material, meaning it can be recycled indefinitely without degradation of physical properties.\n\n"
+                "| Glass Category | Typical Color | Chemical Additives | Sorting Requirement | Remelting Temp |\n"
+                "| :--- | :--- | :--- | :--- | :--- |\n"
+                "| **Flint Glass** | Clear | Pure Silica | Separate from colored | ~1,500°C |\n"
+                "| **Amber Glass** | Brown | Iron, Sulfur, Carbon | Separate to keep color | ~1,400°C |\n"
+                "| **Emerald Glass** | Green | Chromium Oxide | Separate to keep color | ~1,400°C |\n"
+                "| **Borosilicate** | Pyrex / Lab Glass | Boron Trioxide | **Do NOT recycle curbside** | ~1,600°C (Contaminant) |\n\n"
+                "#### 🔍 Disposal & Processing Instructions\n"
+                "1. **Cleanliness:** Empty all residual liquids. Remove metal caps or plastic labels where feasible.\n"
+                "2. **Color Sorting:** Group glass by color. Mixed color cullet (crushed glass) has low commercial value and is restricted to aggregate or fiberglass uses.\n"
+                "3. **No Pyrex/Ceramics:** Heat-resistant glass (Pyrex) and ceramics have different melting characteristics. Just a single ceramic mug can ruin an entire batch of molten glass.\n\n"
+                "#### 📊 Environmental Metrics & Energy Conservation\n"
+                "• **Decomposition Rate:** Glass does not degrade naturally; landfill lifetime is estimated at **1,000,000+ years**.\n"
+                "• **Energy Savings:** Utilizing recycled glass cullet lowers furnace operating temperatures, saving **20-30% of energy** and reducing CO₂ emissions by 10-15%."
             ),
         ],
     },
@@ -96,13 +116,20 @@ WASTE_KNOWLEDGE = {
         ],
         "responses": [
             (
-                "🔩 **Metal Recycling Guide**\n\n"
-                "• Rinse food cans and crush to save bin space\n"
-                "• Aluminum is the most valuable recyclable — saves **95% energy**\n"
-                "• Use a magnet to sort: sticks = steel, doesn't stick = aluminum\n"
-                "• Include clean aluminum foil and trays\n"
-                "• Scrap metal can be sold to dedicated recyclers\n\n"
-                "💡 **Tip:** Recycling one aluminum can saves enough energy to run a TV for 3 hours!"
+                "### 🔩 Professional Metallurgy & Metal Circularity Guide\n\n"
+                "Metals are highly valuable secondary raw materials. Recycling metals preserves minerals, prevents massive open-cast mining, and drastically reduces greenhouse gas emissions.\n\n"
+                "| Metal Type | Magnetic? | Common Examples | Primary Recovery Process | Energy Savings vs. Virgin |\n"
+                "| :--- | :--- | :--- | :--- | :--- |\n"
+                "| **Aluminum** | No | Beverage cans, foil trays | Shredding, melting, ingot casting | **95% Energy Saved** |\n"
+                "| **Steel / Tin** | Yes | Food soup cans, steel frames | Magnetic separation, basic oxygen furnace | **75% Energy Saved** |\n"
+                "| **Copper** | No | Electrical wires, pipes | Electrolytic refining, smelting | **85% Energy Saved** |\n\n"
+                "#### 🔍 Disposal & Processing Instructions\n"
+                "1. **Rinse & Dry:** Remove food organic residue to prevent toxic fumes during secondary smelting.\n"
+                "2. **Compaction:** Flatten aluminum cans to save bin space and optimize transportation efficiency.\n"
+                "3. **Magnetic Check:** Use a kitchen magnet to quickly sort: steel will stick, aluminum will not.\n\n"
+                "#### 📊 Environmental Metrics & Energy Conservation\n"
+                "• **Energy Comparison:** Producing 1 ton of aluminum from bauxite ore requires **14,000 kWh**. Producing it from recycled cans requires only **700 kWh**.\n"
+                "• **Carbon Offset:** Recycling 1 ton of steel prevents the mining of 1.1 tons of iron ore, 630 kg of coal, and avoids **1.8 tons of CO₂ emissions**."
             ),
         ],
     },
@@ -114,13 +141,19 @@ WASTE_KNOWLEDGE = {
         ],
         "responses": [
             (
-                "🌱 **Organic Waste & Composting Guide**\n\n"
-                "• Food scraps, peels, coffee grounds, eggshells → compost!\n"
-                "• Yard waste (leaves, grass, branches) → compost or green bin\n"
-                "• Home composting produces free, nutrient-rich fertilizer\n"
-                "• **Avoid** composting meat, dairy, and oily foods at home\n"
-                "• Decomposition time: **2–4 weeks** (fastest of all categories)\n\n"
-                "💡 **Tip:** Composting diverts organics from landfills and reduces methane emissions by 50%!"
+                "### 🌱 Professional Organic Waste & Bio-Resource Recovery Guide\n\n"
+                "Organic waste comprises biodegradable carbonaceous materials. Diverting organic matter from landfills to aerobic composting systems is a critical tool for climate change mitigation.\n\n"
+                "| Method | Output Product | Timeframe | Best Input Materials | Materials to Avoid (Home) |\n"
+                "| :--- | :--- | :--- | :--- | :--- |\n"
+                "| **Aerobic Composting** | Rich Topsoil Fertilizer | 2–4 months | Fruits, vegetables, coffee grounds, leaves | Meat, dairy, fats, pet waste |\n"
+                "| **Anaerobic Digestion** | Biogas (Methane) & Digestate | 2–4 weeks | Municipal food waste, agricultural manure | Excessive woody/lignin materials |\n\n"
+                "#### 🔍 Composting & Disposal Guidelines\n"
+                "1. **Carbon-to-Nitrogen Balance:** Maintain a healthy ratio of **Browns** (carbon-rich: dry leaves, cardboard) to **Greens** (nitrogen-rich: food scraps, grass clippings) at around 30:1.\n"
+                "2. **Moisture & Aeration:** Ensure compost pile is damp but not soggy (like a wrung-out sponge). Turn the pile regularly to supply oxygen to aerobic microbes.\n"
+                "3. **Municipal Green Bins:** Use green bins for dairy, meat, and bones only if your local municipal system uses high-temperature industrial composting.\n\n"
+                "#### 📊 Environmental Metrics & Carbon Offsets\n"
+                "• **Methane Mitigation:** In landfills, organic waste decomposes anaerobically, emitting **Methane (CH₄)**, which is 28-36 times more potent than CO₂. Composting processes it aerobically, emitting minimal greenhouse gases.\n"
+                "• **Soil Health:** Compost restores soil organic matter, improves water retention by 20%, and captures atmospheric carbon into the soil."
             ),
         ],
     },
@@ -133,14 +166,20 @@ WASTE_KNOWLEDGE = {
         ],
         "responses": [
             (
-                "⚡ **E-Waste Disposal Guide**\n\n"
-                "• **NEVER** place e-waste in regular trash — contains toxic heavy metals!\n"
-                "• Locate certified e-waste recyclers (e-Stewards, R2 certified)\n"
-                "• Remove batteries separately and recycle at drop-off points\n"
-                "• Wipe personal data before recycling devices\n"
-                "• Check manufacturer take-back programs (Apple, Dell, HP, Samsung)\n\n"
-                "⚠️ **Warning:** E-waste contains lead, mercury, and cadmium that cause "
-                "severe soil and groundwater contamination."
+                "### ⚡ Professional E-Waste & Precious Metals Recovery Guide\n\n"
+                "Electronic waste (e-waste) contains both high-value precious metals and hazardous heavy metals. Safe disposal and recycling are mandatory to prevent toxic leaching and recover rare earth elements.\n\n"
+                "| Component | Precious Elements | Toxic Heavy Metals | Disposal Method | Environmental Hazard |\n"
+                "| :--- | :--- | :--- | :--- | :--- |\n"
+                "| **Circuit Boards** | Gold, Silver, Palladium, Copper | Lead, Beryllium | Certified Recycler | Bioaccumulation, soil toxicity |\n"
+                "| **Li-ion Batteries** | Lithium, Cobalt, Nickel, Manganese | Cobalt | Specialized Drop-off | Thermal runaway (fire), water pollution |\n"
+                "| **CRT Monitors** | Copper | Lead, Cadmium, Mercury | Hazardous Waste Facility | Neurotoxic dust release |\n\n"
+                "#### 🔍 Disposal & Processing Instructions\n"
+                "1. **Never Landfill:** E-waste must never be placed in standard municipal trash or regular curbside recycling bins.\n"
+                "2. **Data Sanitation:** Perform a factory reset or physically destroy storage drives before dropping off computers or mobile phones.\n"
+                "3. **Manufacturer Takeback:** Leverage certified programs (e.g. Apple Trade In, Best Buy recycling) to ensure devices are processed under e-Stewards or R2 standards.\n\n"
+                "#### 📊 Environmental Metrics & Material Science\n"
+                "• **Resource Density:** One ton of cell phone circuit boards contains **up to 100 times more gold** than one ton of gold ore.\n"
+                "• **Toxic Composition:** E-waste represents only ~2% of solid waste in landfills, but contributes **70% of heavy metal contamination** in landfills worldwide."
             ),
         ],
     },
@@ -155,17 +194,17 @@ GENERAL_KNOWLEDGE = {
         ],
         "responses": [
             (
-                "♻️ **Top 10 Recycling Tips**\n\n"
-                "1. **Rinse** containers before recycling\n"
-                "2. **Flatten** cardboard and boxes\n"
-                "3. **Check** local guidelines — rules vary by area\n"
-                "4. **Remove** caps and lids when required\n"
-                "5. **Keep it clean** — contamination ruins entire batches\n"
-                "6. **No plastic bags** in curbside bins\n"
-                "7. **Separate** glass by color if required\n"
-                "8. **Compost** food waste instead of trashing it\n"
-                "9. **E-waste** goes to specialized facilities only\n"
-                "10. **Reduce & Reuse** before recycling!"
+                "### ♻️ Professional Recycling Best Practices & Material Circularity\n\n"
+                "Optimizing resource loops requires strict adherence to international waste sorting standards. Use the three-step hierarchy: **Reduce first, Reuse second, Recycle third**.\n\n"
+                "#### 📋 System Guidelines for Maximum Circular Efficiency\n"
+                "1. **Decontaminate Thoroughly:** A single jar with food residue can contaminate a whole truckload of paper during transport. Rinse containers!\n"
+                "2. **Know Your Local Regulations:** Waste management is highly localized. Check with your municipality regarding dual-stream vs. single-stream setups.\n"
+                "3. **Avoid 'Wishcycling':** Do not put non-recyclable items (like garden hoses, toys, or plastic film) in the bin hoping they will be recycled. This clogs optical sorting equipment.\n"
+                "4. **Flatten & Compress:** Maximize spatial density. Flattening cardboard boxes reduces shipping volume, which lowers transportation fuel emissions.\n\n"
+                "#### 📊 Global Recovery Statistics\n"
+                "• **Plastic:** Global recycling rate remains under **10%** due to polymer classification limits.\n"
+                "• **Aluminum:** Global recycling rate is over **75%**, showcasing the economic efficiency of closed-loop metal recovery.\n"
+                "• **Paper:** Around **65%** of paper products are successfully recovered and re-pulped globally."
             ),
         ],
     },
@@ -177,17 +216,16 @@ GENERAL_KNOWLEDGE = {
         ],
         "responses": [
             (
-                "🌍 **Environmental Awareness**\n\n"
-                "• Waste management accounts for ~5% of global greenhouse gas emissions\n"
-                "• Landfills produce methane — 25x more potent than CO₂\n"
-                "• Recycling aluminum saves 95% of energy vs. raw production\n"
-                "• The Great Pacific Garbage Patch is now 3x the size of France\n"
-                "• By 2050, oceans may contain more plastic than fish by weight\n\n"
-                "🌱 **What YOU can do:**\n"
-                "• Reduce consumption\n"
-                "• Choose reusable products\n"
-                "• Sort waste properly\n"
-                "• Support circular economy initiatives"
+                "### 🌍 Advanced Environmental Science & Circular Economy Overview\n\n"
+                "Global waste production is a primary driver of climate change, ocean acidification, and biosphere degradation. Transitioning from a linear model (Take-Make-Waste) to a circular economy is crucial for long-term sustainability.\n\n"
+                "#### 📊 Global Climate & Resource Statistics\n"
+                "• **Carbon Emissions:** Waste management and landfill decay account for approximately **5% of global greenhouse gas emissions**.\n"
+                "• **Landfill Methane:** Decomposing landfill mass produces **Landfill Gas (LFG)**, composed of ~50% methane and ~50% CO₂.\n"
+                "• **Oceanic Plastisphere:** The Great Pacific Garbage Patch spans over **1.6 million square kilometers** and contains over 1.8 trillion plastic pieces.\n\n"
+                "#### 🌱 Circular Economy Framework\n"
+                "• **Design Out Waste:** Products should be designed for disassembly and material recovery from the outset.\n"
+                "• **Keep Materials in Use:** Reuse products and components to extend their lifecycle before material-level recycling.\n"
+                "• **Regenerate Natural Systems:** Compost organic materials to return vital nutrients to agricultural soils."
             ),
         ],
     },
@@ -198,14 +236,18 @@ GENERAL_KNOWLEDGE = {
         ],
         "responses": [
             (
-                "📉 **Waste Reduction Strategies**\n\n"
-                "1. **Refuse** what you don't need\n"
-                "2. **Reduce** what you use\n"
-                "3. **Reuse** before discarding\n"
-                "4. **Repurpose** items creatively\n"
-                "5. **Recycle** what you can't reuse\n"
-                "6. **Rot** (compost) organic waste\n\n"
-                "💡 The most sustainable waste is the waste never created!"
+                "### 📉 Waste Reduction & Zero-Waste Methodologies\n\n"
+                "The Zero-Waste philosophy aims to guide people in changing their lifestyles and practices to emulate sustainable natural cycles, where all discarded materials are designed to become resources for others to use.\n\n"
+                "#### 📋 The 5 R's Zero-Waste Hierarchy\n"
+                "1. **Refuse:** Say no to single-use plastics, flyers, and disposable packaging.\n"
+                "2. **Reduce:** Decrease overall consumption of goods and choose high-quality, durable items.\n"
+                "3. **Reuse:** Swap disposables for reusables (e.g. bags, cups, bottles, containers).\n"
+                "4. **Rot:** Compost organic food scraps and yard trimmings to generate soil nutrients.\n"
+                "5. **Recycle:** Process remaining sorted recyclables as a last resort.\n\n"
+                "#### 💡 Practical Tips for Daily Life\n"
+                "• Buy in bulk to reduce packaging waste by up to 30%.\n"
+                "• Choose loose fruits and vegetables instead of pre-packaged plastic bags.\n"
+                "• Opt for digital bills and documentation to minimize paper waste."
             ),
         ],
     },
@@ -216,18 +258,20 @@ GENERAL_KNOWLEDGE = {
         ],
         "responses": [
             (
-                "⏳ **Decomposition Timeline**\n\n"
-                "| Material | Time |\n"
-                "|---|---|\n"
-                "| Organic waste | 2–4 weeks |\n"
-                "| Paper | 2–6 weeks |\n"
-                "| Cotton cloth | 1–5 months |\n"
-                "| Tin can | 50 years |\n"
-                "| Aluminum can | 200 years |\n"
-                "| Plastic bottle | 450 years |\n"
-                "| Glass bottle | 1 million years |\n"
-                "| Styrofoam | Never |\n"
-                "| E-waste | Never (toxic) |"
+                "### ⏳ Material Decomposition Timeline & Environmental Persistence\n\n"
+                "Decomposition is the process by which organic substances are broken down into simpler organic matter. Synthetic materials lack natural biological enzymes for decomposition, resulting in extreme environmental persistence.\n\n"
+                "| Material Category | Representative Item | Decomposition Time | Environmental Byproducts |\n"
+                "| :--- | :--- | :--- | :--- |\n"
+                "| **Organic Waste** | Food scraps, peels | **2–4 Weeks** | Nutrient compost / LFG |\n"
+                "| **Paper** | Newspapers, napkins | **2–6 Weeks** | Cellulose fibers |\n"
+                "| **Textiles** | Cotton shirts | **1–5 Months** | Natural threads |\n"
+                "| **Wood** | Plywood, lumber | **10–15 Years** | Humus / Cellulose |\n"
+                "| **Metal** | Steel cans | **50 Years** | Iron oxides (Rust) |\n"
+                "| **Metal** | Aluminum cans | **200 Years** | Aluminum oxide particles |\n"
+                "| **Plastic** | PET Beverage bottles | **450 Years** | Microplastics / Nanoplastics |\n"
+                "| **Glass** | Silica bottles | **1 Million Years** | Inert silica sand |\n"
+                "| **Synthetic** | Styrofoam (Polystyrene) | **Never** | Toxic monomer leaching |\n"
+                "| **E-Waste** | Electronics, batteries | **Never** | Lead, Mercury, Cadmium leaching |"
             ),
         ],
     },
@@ -236,20 +280,17 @@ GENERAL_KNOWLEDGE = {
 # Fallback responses when no pattern matches
 FALLBACK_RESPONSES = [
     (
-        "🤔 I'm not sure about that specific topic. I can help with:\n\n"
-        "• **Plastic, Paper, Glass, Metal, Organic waste, E-waste** disposal\n"
-        "• **Recycling tips** and guides\n"
-        "• **Environmental impact** information\n"
-        "• **Decomposition timelines**\n"
-        "• **Waste reduction** strategies\n\n"
-        "Try asking something like: *'How do I recycle plastic bottles?'*"
-    ),
-    (
-        "I specialize in waste management and recycling. Try asking me:\n\n"
-        "• *'What should I do with e-waste?'*\n"
-        "• *'How long does plastic take to decompose?'*\n"
-        "• *'Give me recycling tips'*\n"
-        "• *'Tell me about environmental impact'*"
+        "### 🤖 Eco-Bot Waste Management Assistant (Offline Mode)\n\n"
+        "I am operating in offline rule-based mode because no Gemini API key is configured. I can provide detailed guidance on waste classification and recycling loops.\n\n"
+        "#### 🔍 Topics I Can Help You With:\n"
+        "• **Plastic:** Polymer codes (PET, HDPE, PVC, PP, etc.) and recovery rules.\n"
+        "• **Paper & Cardboard:** Fiber lengths, grease contamination limits.\n"
+        "• **Glass:** Color segregation (flint, amber, emerald) and Pyrex hazards.\n"
+        "• **Metal:** Metallurgy, energy conservation, magnetic sorting.\n"
+        "• **Organic Waste:** Aerobic composting, C:N balance, biogas methane mitigation.\n"
+        "• **E-Waste:** Li-ion batteries, circuit board elements, heavy metals.\n"
+        "• **General Knowledge:** Reduction/Zero-Waste hierarchy, decomposition timelines, and environmental stats.\n\n"
+        "👉 **Try asking me:** *'How do I recycle plastic bottles?'* or *'What is the decomposition time of glass?'*"
     ),
 ]
 
@@ -321,6 +362,11 @@ class WasteManagementChatbot:
         Process user message and yield chunks of the response.
         Uses cached responses if available, or falls back to Gemini API / local rules.
         """
+        def stream_chunked(text: str, delay: float = 0.008, chunk_size: int = 6):
+            for i in range(0, len(text), chunk_size):
+                yield text[i:i+chunk_size]
+                time.sleep(delay)
+
         if not user_message or not user_message.strip():
             yield "Please type a message to get started! 😊"
             return
@@ -330,7 +376,7 @@ class WasteManagementChatbot:
 
         # Check Cache
         if msg_lower in self.cache:
-            yield self.cache[msg_lower]
+            yield from stream_chunked(self.cache[msg_lower])
             return
 
         # 1. Check greetings
@@ -338,7 +384,7 @@ class WasteManagementChatbot:
             if re.search(pattern, msg_lower, re.IGNORECASE):
                 response = random.choice(GREETING_RESPONSES)
                 self.cache[msg_lower] = response
-                yield response
+                yield from stream_chunked(response)
                 return
 
         # 2. Check farewells
@@ -346,7 +392,7 @@ class WasteManagementChatbot:
             if re.search(pattern, msg_lower, re.IGNORECASE):
                 response = random.choice(FAREWELL_RESPONSES)
                 self.cache[msg_lower] = response
-                yield response
+                yield from stream_chunked(response)
                 return
 
         # 3. Check waste-specific knowledge
@@ -355,7 +401,7 @@ class WasteManagementChatbot:
                 if re.search(pattern, msg_lower, re.IGNORECASE):
                     response = random.choice(data["responses"])
                     self.cache[msg_lower] = response
-                    yield response
+                    yield from stream_chunked(response)
                     return
 
         # 4. Check general knowledge
@@ -364,7 +410,7 @@ class WasteManagementChatbot:
                 if re.search(pattern, msg_lower, re.IGNORECASE):
                     response = random.choice(data["responses"])
                     self.cache[msg_lower] = response
-                    yield response
+                    yield from stream_chunked(response)
                     return
 
         # 5. Try Gemini API for unmatched queries
@@ -410,16 +456,16 @@ class WasteManagementChatbot:
                         f"**Eco-Bot (Offline Mode):**\n\n" + random.choice(FALLBACK_RESPONSES)
                     )
                     self.cache[msg_lower] = fallback
-                    yield fallback
+                    yield from stream_chunked(fallback)
                 else:
                     fallback = f"⚠️ AI service temporarily unavailable. (Error: {e})\n\n" + random.choice(FALLBACK_RESPONSES)
-                    yield fallback
+                    yield from stream_chunked(fallback)
                 return
 
         # 6. Fallback
         fallback = random.choice(FALLBACK_RESPONSES)
         self.cache[msg_lower] = fallback
-        yield fallback
+        yield from stream_chunked(fallback)
 
 
     @property
