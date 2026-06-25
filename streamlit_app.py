@@ -312,8 +312,37 @@ def render_ecobot_widget():
                     for chat in st.session_state.chat_history:
                         role = chat.get("role", "assistant")
                         content = chat.get("content", chat.get("text", ""))
+                        ts = chat.get("timestamp", "")
                         with st.chat_message(role):
-                            st.markdown(content)
+                            if ts:
+                                st.markdown(f"{content}\n\n<span style='float:right; color:#6b7280; font-size:11px; margin-top:-5px;'>⏱️ {ts}</span>", unsafe_allow_html=True)
+                            else:
+                                st.markdown(content)
+
+                    # Generate assistant response if the last message was from user
+                    if st.session_state.chat_history and st.session_state.chat_history[-1]["role"] == "user":
+                        user_msg_val = st.session_state.chat_history[-1]["content"]
+                        with st.chat_message("assistant"):
+                            placeholder = st.empty()
+                            placeholder.markdown("🤖 *Eco-Bot is typing...*")
+                            
+                            full_response = ""
+                            stream = st.session_state.chatbot.get_response_stream(user_msg_val, st.session_state.chat_history[:-1])
+                            for chunk in stream:
+                                full_response += chunk
+                                placeholder.markdown(f"{full_response}▌")
+                            
+                            if not st.session_state.chatbot.is_ai_enhanced:
+                                st.session_state.gemini_active = False
+                                
+                            import datetime
+                            ts_assistant = datetime.datetime.now().strftime("%H:%M")
+                            placeholder.markdown(f"{full_response}\n\n<span style='float:right; color:#6b7280; font-size:11px; margin-top:-5px;'>⏱️ {ts_assistant}</span>", unsafe_allow_html=True)
+                            
+                            st.session_state.chat_history.append(
+                                {"role": "assistant", "content": full_response, "timestamp": ts_assistant}
+                            )
+                            st.rerun()
 
                 with st.form("ecobot_chat_form", clear_on_submit=True):
                     input_col, send_col = st.columns([1, 0.28], vertical_alignment="bottom")
@@ -326,15 +355,10 @@ def render_ecobot_widget():
                     submitted = send_col.form_submit_button("Send", use_container_width=True)
 
                 if submitted and user_msg.strip():
+                    import datetime
+                    ts_user = datetime.datetime.now().strftime("%H:%M")
                     st.session_state.chat_history.append(
-                        {"role": "user", "content": user_msg.strip()}
-                    )
-                    with st.spinner("Eco-Bot typing..."):
-                        reply = st.session_state.chatbot.get_response(user_msg.strip())
-                        if not st.session_state.chatbot.is_ai_enhanced:
-                            st.session_state.gemini_active = False
-                    st.session_state.chat_history.append(
-                        {"role": "assistant", "content": reply}
+                        {"role": "user", "content": user_msg.strip(), "timestamp": ts_user}
                     )
                     # No st.rerun() here — form submission triggers a rerun automatically
 
@@ -459,7 +483,8 @@ with st.sidebar:
         "<h2 style='text-align:center; color:#2a9d8f;'>♻️ EcoScan AI</h2>",
         unsafe_allow_html=True,
     )
-    st.markdown("---")
+    if "app_mode" not in st.session_state:
+        st.session_state["app_mode"] = "📊 System Setup & EDA"
 
     # Render radio bound to session_state so selection persists across reruns
     app_mode = st.radio(
@@ -472,6 +497,7 @@ with st.sidebar:
     st.checkbox("Allow saving feedback to disk (for training)", value=st.session_state.get("allow_disk_write", False), key="allow_disk_write")
 
     st.markdown("---")
+
     if app_mode == "📸 Live Classification Workspace":
         st.markdown("### 🔬 XAI Configuration")
         xai_method = st.selectbox(
@@ -495,7 +521,6 @@ with st.sidebar:
 
 # Render EcoBot AFTER sidebar is created to avoid rerun/order races that can reset widgets
 render_ecobot_widget()
-
 
 # ==============================================================================
 # 6. VIEW 1: EDA, DATASET SETUP & MODEL PERFORMANCE
@@ -790,7 +815,7 @@ elif app_mode == "📸 Live Classification Workspace":
                     import time
                     img_filename = f"feedback_{int(time.time())}.jpg"
                     if not st.session_state.get("allow_disk_write", False):
-                        st.info("Demo mode: not saving feedback to disk. Enable 'Allow saving feedback to disk' in the sidebar to save samples.")
+                        st.toast(f"✏️ Classification corrected to '{corrected_class}'! (Feedback saving is disabled in settings)", icon="ℹ️")
                     else:
                         os.makedirs(feedback_dir, exist_ok=True)
                         pil_img.save(os.path.join(feedback_dir, img_filename))

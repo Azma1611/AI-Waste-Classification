@@ -330,8 +330,37 @@ def render_ecobot_widget():
                     for chat in st.session_state.chat_history:
                         role = chat.get("role", "assistant")
                         content = chat.get("content", chat.get("text", ""))
+                        ts = chat.get("timestamp", "")
                         with st.chat_message(role):
-                            st.markdown(content)
+                            if ts:
+                                st.markdown(f"{content}\n\n<span style='float:right; color:#6b7280; font-size:11px; margin-top:-5px;'>⏱️ {ts}</span>", unsafe_allow_html=True)
+                            else:
+                                st.markdown(content)
+
+                    # Generate assistant response if the last message was from user
+                    if st.session_state.chat_history and st.session_state.chat_history[-1]["role"] == "user":
+                        user_msg_val = st.session_state.chat_history[-1]["content"]
+                        with st.chat_message("assistant"):
+                            placeholder = st.empty()
+                            placeholder.markdown("🤖 *Eco-Bot is typing...*")
+                            
+                            full_response = ""
+                            stream = st.session_state.chatbot.get_response_stream(user_msg_val, st.session_state.chat_history[:-1])
+                            for chunk in stream:
+                                full_response += chunk
+                                placeholder.markdown(f"{full_response}▌")
+                            
+                            if not st.session_state.chatbot.is_ai_enhanced:
+                                st.session_state.gemini_active = False
+                                
+                            import datetime
+                            ts_assistant = datetime.datetime.now().strftime("%H:%M")
+                            placeholder.markdown(f"{full_response}\n\n<span style='float:right; color:#6b7280; font-size:11px; margin-top:-5px;'>⏱️ {ts_assistant}</span>", unsafe_allow_html=True)
+                            
+                            st.session_state.chat_history.append(
+                                {"role": "assistant", "content": full_response, "timestamp": ts_assistant}
+                            )
+                            st.rerun()
 
                 with st.form("ecobot_chat_form", clear_on_submit=True):
                     input_col, send_col = st.columns([1, 0.28], vertical_alignment="bottom")
@@ -344,15 +373,10 @@ def render_ecobot_widget():
                     submitted = send_col.form_submit_button("Send", use_container_width=True)
 
                 if submitted and user_msg.strip():
+                    import datetime
+                    ts_user = datetime.datetime.now().strftime("%H:%M")
                     st.session_state.chat_history.append(
-                        {"role": "user", "content": user_msg.strip()}
-                    )
-                    with st.spinner("Eco-Bot typing..."):
-                        reply = st.session_state.chatbot.get_response(user_msg.strip())
-                        if not st.session_state.chatbot.is_ai_enhanced:
-                            st.session_state.gemini_active = False
-                    st.session_state.chat_history.append(
-                        {"role": "assistant", "content": reply}
+                        {"role": "user", "content": user_msg.strip(), "timestamp": ts_user}
                     )
                     st.rerun()
 
@@ -559,6 +583,13 @@ with st.sidebar:
         xai_method = "Score-CAM (Gradient-Free)"
         k_channels = 64
         
+    st.markdown("### ⚙️ System Settings")
+    allow_feedback = st.checkbox(
+        "Allow saving feedback to disk (for training)",
+        value=True,
+        help="When enabled, class corrections will save the waste image to local disk for active learning retraining."
+    )
+    st.markdown("---")
     st.caption("Powered by Advanced Machine Learning, ResNet50 Transfer Learning, and Explainable AI (Score-CAM & Grad-CAM++).")
     st.caption("Developed by AI & Data Science Engineering Team.")
 

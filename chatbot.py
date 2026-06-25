@@ -286,98 +286,140 @@ class WasteManagementChatbot:
         """
         self.gemini_model = None
         self.gemini_available = False
+        self.cache = {}
 
         if gemini_api_key and gemini_api_key != "YOUR_GEMINI_API_KEY_HERE":
             try:
                 import google.generativeai as genai
                 genai.configure(api_key=gemini_api_key)
-                self.gemini_model = genai.GenerativeModel("gemini-1.5-flash")
+                
+                system_instruction = (
+                    "You are Eco-Bot, a highly professional AI Waste Management & Recycling Consultant. "
+                    "Provide detailed, structured, and context-aware advice about waste disposal, circular economy, "
+                    "composting, and eco-friendly choices. Use clear headers, bold text, bullet points, and tables "
+                    "where appropriate to structure your responses. Highlight carbon offsets, materials chemistry "
+                    "(e.g., polymer types, metal extraction energy savings), and environmental statistics suitable for "
+                    "academic final-year engineering projects and research. Maintain an encouraging and professional tone."
+                )
+                
+                self.gemini_model = genai.GenerativeModel(
+                    "gemini-1.5-flash",
+                    system_instruction=system_instruction
+                )
                 self.gemini_available = True
             except Exception:
                 self.gemini_available = False
 
     def get_response(self, user_message: str) -> str:
         """
-        Process user message and return an appropriate response.
+        Process user message and return an appropriate response (backwards-compatible wrapper).
+        """
+        return "".join(list(self.get_response_stream(user_message)))
 
-        Uses rule-based matching first. Falls back to Gemini API
-        for complex queries if available.
-
-        Parameters
-        ----------
-        user_message : str
-            The user's input message.
-
-        Returns
-        -------
-        str : The chatbot's response (Markdown formatted).
+    def get_response_stream(self, user_message: str, history: list = None):
+        """
+        Process user message and yield chunks of the response.
+        Uses cached responses if available, or falls back to Gemini API / local rules.
         """
         if not user_message or not user_message.strip():
-            return "Please type a message to get started! 😊"
+            yield "Please type a message to get started! 😊"
+            return
 
-        msg = user_message.strip().lower()
+        msg_clean = user_message.strip()
+        msg_lower = msg_clean.lower()
+
+        # Check Cache
+        if msg_lower in self.cache:
+            yield self.cache[msg_lower]
+            return
 
         # 1. Check greetings
         for pattern in GREETING_PATTERNS:
-            if re.search(pattern, msg, re.IGNORECASE):
-                return random.choice(GREETING_RESPONSES)
+            if re.search(pattern, msg_lower, re.IGNORECASE):
+                response = random.choice(GREETING_RESPONSES)
+                self.cache[msg_lower] = response
+                yield response
+                return
 
         # 2. Check farewells
         for pattern in FAREWELL_PATTERNS:
-            if re.search(pattern, msg, re.IGNORECASE):
-                return random.choice(FAREWELL_RESPONSES)
+            if re.search(pattern, msg_lower, re.IGNORECASE):
+                response = random.choice(FAREWELL_RESPONSES)
+                self.cache[msg_lower] = response
+                yield response
+                return
 
         # 3. Check waste-specific knowledge
         for category, data in WASTE_KNOWLEDGE.items():
             for pattern in data["patterns"]:
-                if re.search(pattern, msg, re.IGNORECASE):
-                    return random.choice(data["responses"])
+                if re.search(pattern, msg_lower, re.IGNORECASE):
+                    response = random.choice(data["responses"])
+                    self.cache[msg_lower] = response
+                    yield response
+                    return
 
         # 4. Check general knowledge
         for topic, data in GENERAL_KNOWLEDGE.items():
             for pattern in data["patterns"]:
-                if re.search(pattern, msg, re.IGNORECASE):
-                    return random.choice(data["responses"])
+                if re.search(pattern, msg_lower, re.IGNORECASE):
+                    response = random.choice(data["responses"])
+                    self.cache[msg_lower] = response
+                    yield response
+                    return
 
         # 5. Try Gemini API for unmatched queries
         if self.gemini_available and self.gemini_model:
-            return self._ask_gemini(user_message)
+            try:
+                formatted_history = []
+                if history:
+                    for msg in history:
+                        role = "user" if msg.get("role") == "user" else "model"
+                        content = msg.get("content", "")
+                        if content:
+                            formatted_history.append({"role": role, "parts": [content]})
+                
+                chat = self.gemini_model.start_chat(history=formatted_history)
+                response_stream = chat.send_message(msg_clean, stream=True)
+                
+                full_response = ""
+                for chunk in response_stream:
+                    if chunk.text:
+                        full_response += chunk.text
+                        yield chunk.text
+                
+                # Cache the complete response
+                if full_response.strip():
+                    self.cache[msg_lower] = full_response
+                return
+            except Exception as e:
+                err_str = str(e)
+                err_lower = err_str.lower()
+                is_auth_error = (
+                    "api key" in err_lower or
+                    "api_key" in err_lower or
+                    "invalid" in err_lower or
+                    "auth" in err_lower or
+                    "credential" in err_lower or
+                    "unauthorized" in err_lower
+                )
+                if is_auth_error:
+                    self.gemini_available = False  # Disable future queries
+                    fallback = (
+                        "🔑 **Invalid Gemini API Key.** The key provided was "
+                        "rejected by Google. Falling back to local offline mode.\n\n"
+                        f"**Eco-Bot (Offline Mode):**\n\n" + random.choice(FALLBACK_RESPONSES)
+                    )
+                    self.cache[msg_lower] = fallback
+                    yield fallback
+                else:
+                    fallback = f"⚠️ AI service temporarily unavailable. (Error: {e})\n\n" + random.choice(FALLBACK_RESPONSES)
+                    yield fallback
+                return
 
         # 6. Fallback
-        return random.choice(FALLBACK_RESPONSES)
-
-    def _ask_gemini(self, user_message: str) -> str:
-        """Forward query to Gemini API with waste management context."""
-        try:
-            system_prompt = (
-                "You are an expert waste management and recycling consultant. "
-                "Provide helpful, concise, and actionable advice about waste "
-                "disposal, recycling methods, environmental impact, and "
-                f"sustainability. User asks: {user_message}"
-            )
-            response = self.gemini_model.generate_content(system_prompt)
-            return response.text
-        except Exception as e:
-            err_str = str(e)
-            err_lower = err_str.lower()
-            is_auth_error = (
-                "api key" in err_lower or
-                "api_key" in err_lower or
-                "invalid" in err_lower or
-                "auth" in err_lower or
-                "credential" in err_lower or
-                "unauthorized" in err_lower
-            )
-            if is_auth_error:
-                self.gemini_available = False  # Disable future queries to avoid timeouts
-                fallback_msg = random.choice(FALLBACK_RESPONSES)
-                return (
-                    "🔑 **Invalid Gemini API Key.** The key provided in the "
-                    "`GEMINI_API_KEY` environment variable or Streamlit secrets was "
-                    "rejected by Google. Falling back to local offline mode.\n\n"
-                    f"**Eco-Bot (Offline Mode):**\n{fallback_msg}"
-                )
-            return f"⚠️ AI service temporarily unavailable. Error: {e}\n\n" + random.choice(FALLBACK_RESPONSES)
+        fallback = random.choice(FALLBACK_RESPONSES)
+        self.cache[msg_lower] = fallback
+        yield fallback
 
 
     @property
