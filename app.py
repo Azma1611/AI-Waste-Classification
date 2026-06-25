@@ -225,6 +225,9 @@ st.markdown("""
         background: #0b0f19;
         color: #f8fafc;
     }
+    .st-key-ecobot_panel [data-testid="InputInstructions"] {
+        display: none !important;
+    }
     .st-key-ecobot_panel .stFormSubmitButton button,
     .st-key-ecobot_panel .stButton button {
         border-radius: 8px;
